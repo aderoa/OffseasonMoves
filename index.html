@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v0.4';
+const BUILD = 'moves-board v0.6';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -308,14 +308,27 @@ function effectiveBuckets(team){
   for(const k of BASE_KEYS){
     for(const p of (TEAMS[team] ? TEAMS[team][k] : [])){
       const mv = moveFor(team, p.name);
-      if(mv) out[mv.bucket].push({ ...p, note:mv.note, moveId:mv.id, from:k });
-      else out[k].push(p);
+      if(mv){
+        if(mv.bucket==='exercised'){
+          // option picked up → Under Contract (keep the 2026-27 salary)
+          out['under_contract'].push({ ...p, note:mv.note, moveId:mv.id, from:k });
+        } else if(mv.bucket==='declined'){
+          // option turned down → Free Agent. RFA if ≤3 years of service, else UFA
+          // (same CBA/YOS rule the baseline uses); no 2026-27 salary as a free agent.
+          const faKey = (p.yos>0 && p.yos<=3) ? 'rfa' : 'ufa';
+          out[faKey].push({ ...p, sal:0, note:mv.note, moveId:mv.id, from:k });
+        } else {
+          out[mv.bucket].push({ ...p, note:mv.note, moveId:mv.id, from:k });
+        }
+      } else out[k].push(p);
     }
   }
   // manual entries (Drafted / incoming Added) for this team
   for(const m of MOVES){
     if(m.manual && m.team===team) out[m.bucket].push({ name:m.name, sal:0, note:m.note, moveId:m.id, manual:true, extra:m.extra });
   }
+  // keep every bucket in salary order so merged-in players land in the right spot
+  Object.keys(out).forEach(k=> out[k].sort((a,z)=> (z.sal||0)-(a.sal||0) || a.name.localeCompare(z.name)));
   return out;
 }
 
@@ -381,27 +394,47 @@ function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;',
 // ----- logging moves -----
 const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
 
-function pickBucket(promptLabel, dflt){
-  const ans = prompt(promptLabel + '\n\nType one of: added, resigned, extended, left' + (dflt?` (default ${dflt})`:''), dflt||'');
+function pickBucket(promptLabel, dflt, isOption, hasMove){
+  let opts = isOption ? ['exercised','declined','added','resigned','extended','left']
+                      : ['added','resigned','extended','left'];
+  if(hasMove) opts = opts.concat('clear');
+  const head = isOption
+    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\n\nType one of: ' + opts.join(', ')
+    : '\n\nType one of: ' + opts.join(', ');
+  const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
   const k = ans.trim().toLowerCase();
   if(!k && dflt) return dflt;
-  if(['added','resigned','extended','left'].includes(k)) return k;
-  alert('Unrecognized category. Use: added, resigned, extended, or left.');
+  if(opts.includes(k)) return k;
+  alert('Unrecognized category. Use: ' + opts.join(', ') + '.');
+  return null;
+}
+
+// Which baseline bucket a player came from (player_option / team_option / etc.).
+function baselineBucketOf(team, name){
+  if(!TEAMS[team]) return null;
+  for(const k of BASE_KEYS){ if((TEAMS[team][k]||[]).some(p=>p.name===name)) return k; }
   return null;
 }
 
 // Reclassify an existing baseline player into a change bucket.
 function logMove(team, name){
   const existing = moveFor(team, name);
-  const bucket = pickBucket(`Log a move for ${name} (${fullTeam(team)})`, existing?existing.bucket:'');
+  const from = baselineBucketOf(team, name);
+  const isOption = from==='player_option' || from==='team_option';
+  const bucket = pickBucket(`Log a move for ${name} (${fullTeam(team)})`, existing?existing.bucket:'', isOption, !!existing);
   if(!bucket) return;
+  if(bucket==='clear'){
+    if(existing){ MOVES = MOVES.filter(m=>m!==existing); saveMoves(); render(); toast(`${name} → cleared`); }
+    return;
+  }
   const note = prompt('Optional note (e.g. "traded to Miami", "signed overseas — Olympiacos"). Leave blank for none:', existing?existing.note||'':'');
   if(note===null) return;
   if(existing){ existing.bucket=bucket; existing.note=note.trim(); }
   else MOVES.push({ id:genId(), team, name, bucket, note:note.trim(), manual:false });
   saveMoves(); render();
-  toast(`${name} → ${PRESTO_LABEL[bucket]}`);
+  const outLabel = bucket==='exercised' ? 'Under Contract' : bucket==='declined' ? 'Free Agents' : PRESTO_LABEL[bucket];
+  toast(`${name} → ${outLabel}`);
 }
 
 // Add a player not in the data: Drafted rookie, or an incoming Added player.
