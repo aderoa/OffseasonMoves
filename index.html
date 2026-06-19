@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v0.6';
+const BUILD = 'moves-board v0.7';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -366,7 +366,7 @@ function render(){
       <div class="team-hd" onclick="if(!event.target.closest('.add-mini'))this.parentNode.classList.toggle('collapsed')">
         <span class="nm">${esc(fullTeam(team))}</span>
         <span class="counts">${counts}</span>
-        <button class="add-mini" title="Add a Drafted or incoming player" onclick="event.stopPropagation();addManual('${esc(team)}')">+ Add</button>
+        <button class="add-mini" title="Add a Drafted or incoming player" onclick="event.stopPropagation();addManual('${jsArg(team)}')">+ Add</button>
         <span class="chev">▼</span>
       </div>
       <div class="team-bd">${cols}</div>
@@ -385,11 +385,14 @@ function liFor(team, bucketKey, p){
   if(isChange){
     action = `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
   } else {
-    action = `<button class="li-act" title="Log a move for ${esc(p.name)}" onclick="logMove('${esc(team)}','${esc(p.name)}')">⋯</button>`;
+    action = `<button class="li-act" title="Log a move for ${esc(p.name)}" onclick="logMove('${jsArg(team)}','${jsArg(p.name)}')">⋯</button>`;
   }
   return `<li><span class="pn">${esc(p.name)}</span>${noteTag}<span class="meta">${meta}</span>${action}</li>`;
 }
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Escape a value for a single-quoted JS string inside an HTML attribute (onclick="fn('…')").
+// Without this, apostrophe names like D'Angelo Russell terminate the string and the click silently fails.
+function jsArg(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ----- logging moves -----
 const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
