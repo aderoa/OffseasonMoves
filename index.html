@@ -75,19 +75,6 @@
   .bucket li .meta{margin-left:auto;color:var(--faint);font-family:ui-monospace,monospace;font-size:.62rem;flex-shrink:0}
   .bucket .empty{font-size:.66rem;color:var(--faint);font-style:italic;padding:.2rem 0}
 
-  /* modal for Presto export */
-  .scrim{position:fixed;inset:0;background:rgba(8,10,13,.75);z-index:100;display:none;align-items:center;justify-content:center;padding:1rem}
-  .scrim.on{display:flex}
-  .modal{background:var(--panel);border:1px solid var(--line2);border-radius:12px;max-width:820px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
-  .modal-hd{display:flex;align-items:center;gap:.6rem;padding:.85rem 1rem;border-bottom:1px solid var(--line)}
-  .modal-hd h3{margin:0;font-size:.95rem}
-  .modal-hd .x{margin-left:auto;background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;line-height:1}
-  .modal-bd{padding:1rem;overflow:auto}
-  .modal-bd textarea{width:100%;height:340px;font-family:ui-monospace,'JetBrains Mono',monospace;font-size:.68rem;
-    background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:.7rem;resize:vertical;line-height:1.45}
-  .modal-ft{display:flex;gap:.5rem;justify-content:flex-end;padding:.8rem 1rem;border-top:1px solid var(--line)}
-  .hint{font-size:.7rem;color:var(--muted);margin:.1rem 0 .7rem}
-
   .toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);background:var(--panel2);
     border:1px solid var(--line2);border-radius:8px;padding:.55rem 1rem;font-size:.78rem;z-index:200;
     box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;transition:opacity .2s;pointer-events:none}
@@ -106,27 +93,13 @@
   <div class="toolbar">
     <input type="text" class="search" id="search" placeholder="Filter teams or players…">
     <button class="btn" id="expandBtn" onclick="toggleAll()">Collapse all</button>
-    <button class="btn primary" id="prestoBtn" onclick="openPresto()">⧉ Generate Presto HTML</button>
+    <button class="btn primary" id="prestoBtn" onclick="copyPresto()">⧉ Copy Presto HTML</button>
   </div>
 
   <div class="legend" id="legend"></div>
 
   <div id="content">
     <div class="loading"><div class="spinner"></div><p>Loading contracts…</p></div>
-  </div>
-</div>
-
-<div class="scrim" id="scrim">
-  <div class="modal">
-    <div class="modal-hd"><h3>Presto HTML — Offseason Moves</h3><button class="x" onclick="closePresto()">×</button></div>
-    <div class="modal-bd">
-      <p class="hint">Copy this and paste into Presto (HTML source), same as the Draft Workouts board. Empty buckets are omitted.</p>
-      <textarea id="prestoOut" readonly></textarea>
-    </div>
-    <div class="modal-ft">
-      <button class="btn" onclick="closePresto()">Close</button>
-      <button class="btn primary" onclick="copyPresto()">Copy to clipboard</button>
-    </div>
   </div>
 </div>
 
@@ -153,6 +126,21 @@ const PRESTO_LABEL = {
   under_contract:'Under Contract', player_option:'Player Options', team_option:'Team Options',
   rfa:'Restricted Free Agents', ufa:'Unrestricted Free Agents'
 };
+
+// Full official team names, keyed by the short name used in the contracts data.
+const TEAM_NAMES = {
+  'Atlanta':'Atlanta Hawks', 'Boston':'Boston Celtics', 'Brooklyn':'Brooklyn Nets',
+  'Charlotte':'Charlotte Hornets', 'Chicago':'Chicago Bulls', 'Cleveland':'Cleveland Cavaliers',
+  'Dallas':'Dallas Mavericks', 'Denver':'Denver Nuggets', 'Detroit':'Detroit Pistons',
+  'Golden State':'Golden State Warriors', 'Houston':'Houston Rockets', 'Indiana':'Indiana Pacers',
+  'LA Clippers':'Los Angeles Clippers', 'LA Lakers':'Los Angeles Lakers', 'Memphis':'Memphis Grizzlies',
+  'Miami':'Miami Heat', 'Milwaukee':'Milwaukee Bucks', 'Minnesota':'Minnesota Timberwolves',
+  'New Orleans':'New Orleans Pelicans', 'New York':'New York Knicks', 'Oklahoma City':'Oklahoma City Thunder',
+  'Orlando':'Orlando Magic', 'Philadelphia':'Philadelphia 76ers', 'Phoenix':'Phoenix Suns',
+  'Portland':'Portland Trail Blazers', 'Sacramento':'Sacramento Kings', 'San Antonio':'San Antonio Spurs',
+  'Toronto':'Toronto Raptors', 'Utah':'Utah Jazz', 'Washington':'Washington Wizards'
+};
+function fullTeam(t){ return TEAM_NAMES[t] || t; }
 
 let TEAMS = {};        // teamName -> { bucketKey: [players] }
 let teamOrder = [];
@@ -198,28 +186,32 @@ function buildTeams(rows){
     const name=(r[0]||'').trim(); if(!name) continue;
     const team=(r[2]||'').trim(); if(!team) continue;
     const opt=(r[26]||'').trim().toUpperCase();
-    const sal=num(r[10]);
+    const sal=num(r[10]);          // 2026-27 salary
     const yos=num(r[38]);
+    const end=(r[27]||'').trim();  // contract end year
     let bucket;
-    if(opt.includes('PLAYER')) bucket='player_option';
-    else if(opt.includes('TEAM')) bucket='team_option';
-    else if(sal>0) bucket='under_contract';
-    else bucket = (yos>0 && yos<=3) ? 'rfa' : 'ufa';
+    if(sal>0){
+      // Under contract for 2026-27. The option only matters for THIS board when the
+      // option year IS 2026-27 (contract ends 2027). A later-year option (e.g. a PO
+      // in 2028-29) still means the player is under contract for 2026-27.
+      if(end==='2027' && opt.includes('PLAYER')) bucket='player_option';
+      else if(end==='2027' && opt.includes('TEAM')) bucket='team_option';
+      else bucket='under_contract';
+    } else {
+      bucket = (yos>0 && yos<=3) ? 'rfa' : 'ufa';
+    }
     if(!TEAMS[team]){ TEAMS[team]={}; BUCKETS.forEach(b=>TEAMS[team][b.key]=[]); }
     TEAMS[team][bucket].push({ name, sal, yos });
   }
   // sort each bucket by salary desc then name; team order alphabetical
   Object.values(TEAMS).forEach(t=>BUCKETS.forEach(b=>
     t[b.key].sort((a,z)=> z.sal-a.sal || a.name.localeCompare(z.name))));
-  teamOrder = Object.keys(TEAMS).sort();
+  teamOrder = Object.keys(TEAMS).sort((a,b)=>fullTeam(a).localeCompare(fullTeam(b)));
 }
 
 // ---------- render ----------
 function fmtMeta(p){
-  const parts=[];
-  if(p.sal>0) parts.push('$'+(p.sal/1e6).toFixed(1)+'M');
-  if(p.yos>0) parts.push(p.yos+'y');
-  return parts.join(' · ');
+  return p.sal>0 ? '$'+(p.sal/1e6).toFixed(1)+'M' : '';
 }
 function render(){
   // legend
@@ -251,7 +243,7 @@ function render(){
     }).join('');
     blocks.push(`<div class="team${allCollapsed?' collapsed':''}">
       <div class="team-hd" onclick="this.parentNode.classList.toggle('collapsed')">
-        <span class="nm">${esc(team)}</span>
+        <span class="nm">${esc(fullTeam(team))}</span>
         <span class="counts">${counts}</span>
         <span class="chev">▼</span>
       </div>
@@ -277,7 +269,7 @@ function buildPrestoHTML(){
     const t=TEAMS[team];
     const total = BUCKETS.reduce((s,b)=>s+t[b.key].length,0);
     if(!total) continue;
-    L.push(`  <h3 style="margin:1.2em 0 .3em;font-size:1.1em;border-bottom:2px solid #b45309;padding-bottom:.15em">${esc(team)}</h3>`);
+    L.push(`  <h3 style="margin:1.2em 0 .3em;font-size:1.1em;border-bottom:2px solid #b45309;padding-bottom:.15em">${esc(fullTeam(team))}</h3>`);
     for(const b of BUCKETS){
       const players=t[b.key];
       if(!players.length) continue;
@@ -294,14 +286,18 @@ function buildPrestoHTML(){
   L.push('</div>');
   return L.join('\n');
 }
-function openPresto(){
-  document.getElementById('prestoOut').value = buildPrestoHTML();
-  document.getElementById('scrim').classList.add('on');
-}
-function closePresto(){ document.getElementById('scrim').classList.remove('on'); }
 function copyPresto(){
-  const ta=document.getElementById('prestoOut'); ta.select();
-  navigator.clipboard.writeText(ta.value).then(()=>toast('Copied Presto HTML'),()=>{document.execCommand('copy');toast('Copied');});
+  const html = buildPrestoHTML();
+  const done = ()=>toast('Presto HTML copied — ready to paste');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(html).then(done, ()=>fallbackCopy(html));
+  } else fallbackCopy(html);
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea'); ta.value=text;
+  ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta);
+  ta.select(); try{document.execCommand('copy');toast('Presto HTML copied');}catch(e){toast('Copy failed');}
+  document.body.removeChild(ta);
 }
 
 let _tt;
@@ -309,7 +305,6 @@ function toast(m){ const e=document.getElementById('toast'); e.textContent=m; e.
   clearTimeout(_tt); _tt=setTimeout(()=>e.classList.remove('show'),2200); }
 
 document.getElementById('search').addEventListener('input', render);
-document.getElementById('scrim').addEventListener('click', e=>{ if(e.target.id==='scrim') closePresto(); });
 load();
 </script>
 </body>
