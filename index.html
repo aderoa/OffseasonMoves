@@ -18,6 +18,7 @@
     --amber:#b45309; --amber-lite:#f5a524; --blue:#1a4d8f; --blue-lite:#4d8df6;
     --green:#2f9e6b; --red:#d8584f; --purple:#8b6fc0;
     --uc:#4d8df6; --po:#f5a524; --to:#d8584f; --rfa:#2f9e6b; --ufa:#94a1b0;
+    --added:#3fb97f; --resigned:#5db4e6; --extended:#b89be0; --left:#e07a6f; --drafted:#e0b341;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
@@ -74,6 +75,18 @@
   .bucket li .pn{color:var(--txt)}
   .bucket li .meta{margin-left:auto;color:var(--faint);font-family:ui-monospace,monospace;font-size:.62rem;flex-shrink:0}
   .bucket .empty{font-size:.66rem;color:var(--faint);font-style:italic;padding:.2rem 0}
+  .bucket li .li-act{margin-left:.35rem;flex-shrink:0;background:none;border:1px solid var(--line);
+    color:var(--faint);border-radius:5px;font-size:.62rem;line-height:1;padding:.12rem .3rem;cursor:pointer;opacity:0;transition:.12s}
+  .bucket li:hover .li-act{opacity:1}
+  .bucket li .li-act:hover{border-color:var(--blue-lite);color:var(--blue-lite)}
+  .bucket li .li-act.undo:hover{border-color:var(--red);color:var(--red)}
+  .bucket li .note{font-size:.6rem;color:var(--amber-lite);font-style:italic;margin-left:.1rem;flex-shrink:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bucket[data-bucket="added"] h4 .dot{background:var(--added)}
+  .add-mini{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:6px;
+    font:inherit;font-size:.6rem;font-weight:600;padding:.18rem .45rem;cursor:pointer;margin-left:.4rem;flex-shrink:0;transition:.12s}
+  .add-mini:hover{border-color:var(--added);color:var(--added)}
+  .team-hd .counts{margin-left:auto}
 
   .toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);background:var(--panel2);
     border:1px solid var(--line2);border-radius:8px;padding:.55rem 1rem;font-size:.78rem;z-index:200;
@@ -94,6 +107,8 @@
     <input type="text" class="search" id="search" placeholder="Filter teams or players…">
     <button class="btn" id="expandBtn" onclick="toggleAll()">Collapse all</button>
     <button class="btn primary" id="prestoBtn" onclick="copyPresto()">⧉ Copy Presto HTML</button>
+    <button class="btn" title="Back up your logged moves to a file" onclick="exportMoves()">↧ Export</button>
+    <button class="btn" title="Restore logged moves from a file" onclick="importMoves()">↥ Import</button>
   </div>
 
   <div class="legend" id="legend"></div>
@@ -106,7 +121,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v0.1';
+const BUILD = 'moves-board v0.2';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -114,17 +129,30 @@ console.log('%c📋 '+BUILD, 'color:#f5a524;font-weight:bold');
 
 // Bucket definitions (order + labels + colors). This is the baseline set; the
 // "change" buckets (Added / Re-signed / Extended / Left) come in the next pass.
-const BUCKETS = [
+// Baseline (auto-derived) buckets, shown first.
+const BASE_BUCKETS = [
   { key:'under_contract', label:'Under Contract', color:'var(--uc)' },
   { key:'player_option',  label:'Player Option',  color:'var(--po)' },
   { key:'team_option',    label:'Team Option',    color:'var(--to)' },
   { key:'rfa',            label:'Restricted FAs', color:'var(--rfa)' },
   { key:'ufa',            label:'Unrestricted FAs', color:'var(--ufa)' },
 ];
-// Presto export labels (full words, matching the editorial tone of the workouts board)
+// Change buckets (logged moves), shown after the baseline.
+const CHANGE_BUCKETS = [
+  { key:'added',     label:'Added',     color:'var(--added)' },
+  { key:'resigned',  label:'Re-signed', color:'var(--resigned)' },
+  { key:'extended',  label:'Extended',  color:'var(--extended)' },
+  { key:'drafted',   label:'Drafted',   color:'var(--drafted)' },
+  { key:'left',      label:'Left',      color:'var(--left)' },
+];
+const BUCKETS = BASE_BUCKETS.concat(CHANGE_BUCKETS); // for legend/counts
+const BASE_KEYS = BASE_BUCKETS.map(b=>b.key);
+const CHANGE_KEYS = CHANGE_BUCKETS.map(b=>b.key);
+// Presto export labels (full words)
 const PRESTO_LABEL = {
   under_contract:'Under Contract', player_option:'Player Options', team_option:'Team Options',
-  rfa:'Restricted Free Agents', ufa:'Unrestricted Free Agents'
+  rfa:'Restricted Free Agents', ufa:'Unrestricted Free Agents',
+  added:'Added', resigned:'Re-signed', extended:'Extended', drafted:'Drafted', left:'Left'
 };
 
 // Full official team names, keyed by the short name used in the contracts data.
@@ -142,9 +170,29 @@ const TEAM_NAMES = {
 };
 function fullTeam(t){ return TEAM_NAMES[t] || t; }
 
-let TEAMS = {};        // teamName -> { bucketKey: [players] }
+let TEAMS = {};        // teamName -> { bucketKey: [players] } (BASELINE, from data)
 let teamOrder = [];
 let allCollapsed = false;
+
+// ---------- MOVES (logged changes, persisted to localStorage) ----------
+// A move reclassifies a player into a change bucket. Two kinds:
+//   - reclassify: an existing baseline player moved to a change bucket (keyed by team|name)
+//   - manual:     a player not in the data (Drafted rookie, incoming Added FA) — has own team
+// Shape: { id, team, name, bucket, note, manual:bool }
+const MOVES_KEY = 'omb_moves_v1';
+let MOVES = [];
+function loadMoves(){
+  try{ MOVES = JSON.parse(localStorage.getItem(MOVES_KEY) || '[]'); }
+  catch(e){ MOVES = []; }
+  if(!Array.isArray(MOVES)) MOVES = [];
+}
+function saveMoves(){
+  try{ localStorage.setItem(MOVES_KEY, JSON.stringify(MOVES)); }catch(e){}
+}
+function moveKey(team,name){ return team+'|'+name; }
+// is there a reclassify move for this baseline player?
+function moveFor(team,name){ return MOVES.find(m=>!m.manual && m.team===team && m.name===name); }
+function genId(){ return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
 // ---------- CSV parse ----------
 function parseCSV(text){
@@ -168,6 +216,7 @@ async function load(){
     const rows = parseCSV(await resp.text());
     if(rows.length<2) throw new Error('no rows');
     buildTeams(rows);
+    loadMoves();
     render();
   }catch(e){
     document.getElementById('content').innerHTML =
@@ -213,8 +262,26 @@ function buildTeams(rows){
 function fmtMeta(p){
   return p.sal>0 ? '$'+(p.sal/1e6).toFixed(1)+'M' : '';
 }
+// Build the effective (post-moves) bucket map for a team: baseline minus reclassified
+// players, plus reclassified + manual players in their change buckets.
+function effectiveBuckets(team){
+  const out={}; BUCKETS.forEach(b=>out[b.key]=[]);
+  // baseline players, unless reclassified by a move
+  for(const k of BASE_KEYS){
+    for(const p of (TEAMS[team] ? TEAMS[team][k] : [])){
+      const mv = moveFor(team, p.name);
+      if(mv) out[mv.bucket].push({ ...p, note:mv.note, moveId:mv.id, from:k });
+      else out[k].push(p);
+    }
+  }
+  // manual entries (Drafted / incoming Added) for this team
+  for(const m of MOVES){
+    if(m.manual && m.team===team) out[m.bucket].push({ name:m.name, sal:0, note:m.note, moveId:m.id, manual:true, extra:m.extra });
+  }
+  return out;
+}
+
 function render(){
-  // legend
   document.getElementById('legend').innerHTML = BUCKETS.map(b=>
     `<span class="k"><span class="dot" style="background:${b.color}"></span>${b.label}</span>`).join('');
 
@@ -222,29 +289,33 @@ function render(){
   const el = document.getElementById('content');
   const blocks=[];
   for(const team of teamOrder){
-    const t=TEAMS[team];
-    // filter: match team name OR any player
+    const t = effectiveBuckets(team);
     let show=true;
     if(filter){
-      const teamMatch = team.toLowerCase().includes(filter);
+      const teamMatch = fullTeam(team).toLowerCase().includes(filter) || team.toLowerCase().includes(filter);
       const playerMatch = BUCKETS.some(b=>t[b.key].some(p=>p.name.toLowerCase().includes(filter)));
       show = teamMatch || playerMatch;
     }
     if(!show) continue;
-    const counts = BUCKETS.map(b=>`<span class="c"><span class="dot" style="width:7px;height:7px;border-radius:2px;background:${b.color}"></span><b>${t[b.key].length}</b></span>`).join('');
+    // counts: only show non-empty change buckets in the header to keep it clean
+    const counts = BUCKETS.filter(b=>BASE_KEYS.includes(b.key)||t[b.key].length)
+      .map(b=>`<span class="c"><span class="dot" style="width:7px;height:7px;border-radius:2px;background:${b.color}"></span><b>${t[b.key].length}</b></span>`).join('');
     const cols = BUCKETS.map(b=>{
       const players=t[b.key];
+      // hide empty change buckets entirely; always show the 5 baseline buckets
+      if(!players.length && CHANGE_KEYS.includes(b.key)) return '';
       const items = players.length
-        ? players.map(p=>`<li><span class="pn">${esc(p.name)}</span><span class="meta">${fmtMeta(p)}</span></li>`).join('')
+        ? players.map(p=>liFor(team,b.key,p)).join('')
         : `<div class="empty">—</div>`;
-      return `<div class="bucket">
+      return `<div class="bucket" data-bucket="${b.key}">
         <h4><span class="dot" style="background:${b.color}"></span>${b.label}<span class="n">${players.length}</span></h4>
         <ul>${items}</ul></div>`;
     }).join('');
     blocks.push(`<div class="team${allCollapsed?' collapsed':''}">
-      <div class="team-hd" onclick="this.parentNode.classList.toggle('collapsed')">
+      <div class="team-hd" onclick="if(!event.target.closest('.add-mini'))this.parentNode.classList.toggle('collapsed')">
         <span class="nm">${esc(fullTeam(team))}</span>
         <span class="counts">${counts}</span>
+        <button class="add-mini" title="Add a Drafted or incoming player" onclick="event.stopPropagation();addManual('${esc(team)}')">+ Add</button>
         <span class="chev">▼</span>
       </div>
       <div class="team-bd">${cols}</div>
@@ -252,7 +323,99 @@ function render(){
   }
   el.innerHTML = blocks.length ? blocks.join('') : `<div class="loading">No teams or players match "${esc(filter)}".</div>`;
 }
+
+// One player line. Baseline players get a "move" action; logged players show their
+// note + an undo. Manual players show an edit/remove.
+function liFor(team, bucketKey, p){
+  const meta = fmtMeta(p);
+  const isChange = CHANGE_KEYS.includes(bucketKey);
+  const noteTag = p.note ? `<span class="note">${esc(p.note)}</span>` : '';
+  let action;
+  if(isChange){
+    action = `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
+  } else {
+    action = `<button class="li-act" title="Log a move for ${esc(p.name)}" onclick="logMove('${esc(team)}','${esc(p.name)}')">⋯</button>`;
+  }
+  return `<li><span class="pn">${esc(p.name)}</span>${noteTag}<span class="meta">${meta}</span>${action}</li>`;
+}
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ----- logging moves -----
+const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
+
+function pickBucket(promptLabel, dflt){
+  const ans = prompt(promptLabel + '\n\nType one of: added, resigned, extended, left' + (dflt?` (default ${dflt})`:''), dflt||'');
+  if(ans===null) return null;
+  const k = ans.trim().toLowerCase();
+  if(!k && dflt) return dflt;
+  if(['added','resigned','extended','left'].includes(k)) return k;
+  alert('Unrecognized category. Use: added, resigned, extended, or left.');
+  return null;
+}
+
+// Reclassify an existing baseline player into a change bucket.
+function logMove(team, name){
+  const existing = moveFor(team, name);
+  const bucket = pickBucket(`Log a move for ${name} (${fullTeam(team)})`, existing?existing.bucket:'');
+  if(!bucket) return;
+  const note = prompt('Optional note (e.g. "traded to Miami", "signed overseas — Olympiacos"). Leave blank for none:', existing?existing.note||'':'');
+  if(note===null) return;
+  if(existing){ existing.bucket=bucket; existing.note=note.trim(); }
+  else MOVES.push({ id:genId(), team, name, bucket, note:note.trim(), manual:false });
+  saveMoves(); render();
+  toast(`${name} → ${PRESTO_LABEL[bucket]}`);
+}
+
+// Add a player not in the data: Drafted rookie, or an incoming Added player.
+function addManual(team){
+  const name = prompt(`Add a player to ${fullTeam(team)} (not yet in the database).\n\nUse this for drafted rookies or incoming signings/trades.\n\nPlayer name:`, '');
+  if(name===null || !name.trim()) return;
+  const bucket = (function(){
+    const ans = prompt('Category for '+name.trim()+':\n\nType: drafted, added, resigned, extended, or left\n(default: drafted)', 'drafted');
+    if(ans===null) return null;
+    const k=ans.trim().toLowerCase()||'drafted';
+    if(['drafted','added','resigned','extended','left'].includes(k)) return k;
+    alert('Unrecognized category.'); return null;
+  })();
+  if(!bucket) return;
+  const note = prompt('Optional note (e.g. pick number, "from trade with PHX", "two-way"). Leave blank for none:', '');
+  if(note===null) return;
+  MOVES.push({ id:genId(), team, name:name.trim(), bucket, note:note.trim(), manual:true });
+  saveMoves(); render();
+  toast(`${name.trim()} added → ${PRESTO_LABEL[bucket]}`);
+}
+
+function undoMove(id){
+  const m = MOVES.find(x=>x.id===id); if(!m) return;
+  MOVES = MOVES.filter(x=>x.id!==id);
+  saveMoves(); render();
+  toast(`Reverted ${m.name}`);
+}
+
+// ----- export / import (backup of the move set) -----
+function exportMoves(){
+  const blob = new Blob([JSON.stringify(MOVES,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='offseason-moves-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Moves exported');
+}
+function importMoves(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json';
+  inp.onchange=()=>{ const f=inp.files[0]; if(!f) return;
+    const rd=new FileReader();
+    rd.onload=()=>{ try{
+      const arr=JSON.parse(rd.result);
+      if(!Array.isArray(arr)) throw new Error('not a moves file');
+      if(MOVES.length && !confirm(`Replace your current ${MOVES.length} logged move(s) with ${arr.length} from the file?`)) return;
+      MOVES=arr; saveMoves(); render(); toast(`Imported ${arr.length} move(s)`);
+    }catch(e){ alert('Could not import: '+e.message); } };
+    rd.readAsText(f);
+  };
+  inp.click();
+}
 
 function toggleAll(){
   allCollapsed=!allCollapsed;
@@ -266,19 +429,24 @@ function buildPrestoHTML(){
   L.push('<div class="omb-wrap" style="font-family:sans-serif;max-width:700px;margin:0 auto">');
   L.push('  <p style="margin:0 0 1em">Where every team stands heading into the 2026-27 offseason — each roster sorted by contract status. We\u2019ll update this board with every move as free agency unfolds.</p>');
   for(const team of teamOrder){
-    const t=TEAMS[team];
+    const t=effectiveBuckets(team);
     const total = BUCKETS.reduce((s,b)=>s+t[b.key].length,0);
     if(!total) continue;
     L.push(`  <h3 style="margin:1.2em 0 .3em;font-size:1.1em;border-bottom:2px solid #b45309;padding-bottom:.15em">${esc(fullTeam(team))}</h3>`);
     for(const b of BUCKETS){
       const players=t[b.key];
-      if(!players.length) continue;
+      if(!players.length) continue; // omit empty buckets (incl. unused change buckets)
       L.push(`  <h4 style="margin:.6em 0 .2em;font-size:.95em;color:#b45309">${PRESTO_LABEL[b.key]} <span style="color:#999;font-weight:normal">(${players.length})</span></h4>`);
       L.push('  <ul style="list-style:none;margin:.2em 0 .6em 0;padding:0">');
       for(const p of players){
         const meta = fmtMeta(p);
-        const metaSpan = meta ? ` <span style="color:#666;font-size:.9em">(${meta})</span>` : '';
-        L.push(`    <li style="margin:.12em 0">${esc(p.name)}${metaSpan}</li>`);
+        // for change buckets the note is the useful detail (e.g. "signed overseas");
+        // for baseline buckets the salary is shown.
+        let detail = '';
+        if(p.note) detail = p.note;
+        else if(meta) detail = meta;
+        const detailSpan = detail ? ` <span style="color:#666;font-size:.9em">(${esc(detail)})</span>` : '';
+        L.push(`    <li style="margin:.12em 0">${esc(p.name)}${detailSpan}</li>`);
       }
       L.push('  </ul>');
     }
