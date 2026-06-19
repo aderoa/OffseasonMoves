@@ -211,19 +211,43 @@ function num(v){ const n=parseInt(String(v||'').replace(/[^0-9-]/g,'')); return 
 // ---------- load + bucket ----------
 async function load(){
   try{
-    const resp = await fetch(`${API_BASE}/api/contracts`);
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const rows = parseCSV(await resp.text());
-    if(rows.length<2) throw new Error('no rows');
-    buildTeams(rows);
+    // Immovable baseline first: the frozen end-of-2025-26 snapshot (baseline.json,
+    // committed alongside this page). Falls back to live derivation only if the
+    // snapshot isn't present yet, so the board never breaks during setup.
+    let usedSnapshot=false;
+    try{
+      const bResp = await fetch('baseline.json', {cache:'no-store'});
+      if(bResp.ok){ const data = await bResp.json(); if(data && data.teams){ applyBaseline(data); usedSnapshot=true; console.log('[moves] baseline: frozen snapshot ('+(data.count||'?')+' players, '+(data.season||'')+')'); } }
+    }catch(_){}
+    if(!usedSnapshot){
+      console.warn('[moves] baseline.json not found — using LIVE derivation (not frozen). Commit baseline.json to freeze.');
+      const resp = await fetch(`${API_BASE}/api/contracts`);
+      if(!resp.ok) throw new Error('HTTP '+resp.status);
+      const rows = parseCSV(await resp.text());
+      if(rows.length<2) throw new Error('no rows');
+      buildTeams(rows);
+    }
     loadMoves();
     render();
   }catch(e){
     document.getElementById('content').innerHTML =
-      `<div class="error"><p>Couldn't load contracts. ${e.message}</p>
+      `<div class="error"><p>Couldn't load rosters. ${e.message}</p>
        <button class="btn" onclick="load()" style="margin-top:.6rem">Retry</button></div>`;
     console.error('[moves]', e);
   }
+}
+
+// Load the frozen baseline snapshot into TEAMS (already bucketed at end of 2025-26).
+// This is the immovable reference — moves are tracked against it.
+function applyBaseline(data){
+  TEAMS = {};
+  const teams = data.teams || {};
+  for(const team in teams){
+    TEAMS[team] = {};
+    BUCKETS.forEach(b=> TEAMS[team][b.key] = Array.isArray(teams[team][b.key]) ? teams[team][b.key].slice() : []);
+    BUCKETS.forEach(b=> TEAMS[team][b.key].sort((a,z)=> z.sal-a.sal || a.name.localeCompare(z.name)));
+  }
+  teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
 }
 
 function buildTeams(rows){
