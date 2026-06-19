@@ -63,10 +63,12 @@
   .team-hd .chev{color:var(--faint);transition:transform .15s;font-size:.7rem}
   .team.collapsed .chev{transform:rotate(-90deg)}
   .team.collapsed .team-bd{display:none}
-  .team-bd{padding:.4rem .9rem 1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem}
+  .team-bd{padding:.4rem .9rem 1rem;display:block}
+  .bucket{display:grid;grid-template-columns:160px 1fr;gap:.7rem;align-items:start;padding:.4rem 0;border-bottom:1px solid rgba(255,255,255,.05)}
+  .bucket:last-child{border-bottom:none}
 
-  .bucket h4{margin:.5rem 0 .4rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;
-    display:flex;align-items:center;gap:.35rem;padding-bottom:.25rem;border-bottom:1px solid var(--line)}
+  .bucket h4{margin:.18rem 0 0;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;
+    display:flex;align-items:center;gap:.35rem;padding:0 .2rem 0 0;border:none;color:var(--muted);line-height:1.3}
   .bucket h4 .dot{width:8px;height:8px;border-radius:2px}
   .bucket h4 .n{margin-left:auto;color:var(--faint);font-family:ui-monospace,monospace;font-weight:600}
   .bucket ul{list-style:none;margin:0;padding:0}
@@ -92,7 +94,7 @@
     border:1px solid var(--line2);border-radius:8px;padding:.55rem 1rem;font-size:.78rem;z-index:200;
     box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;transition:opacity .2s;pointer-events:none}
   .toast.show{opacity:1}
-  @media(max-width:600px){ .team-hd .counts{display:none} }
+  @media(max-width:600px){ .team-hd .counts{display:none} .bucket{grid-template-columns:104px 1fr;gap:.5rem} }
 </style>
 </head>
 <body>
@@ -121,7 +123,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v0.2';
+const BUILD = 'moves-board v0.3';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
