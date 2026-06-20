@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v0.8';
+const BUILD = 'moves-board v0.9';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -499,6 +499,12 @@ function toggleAll(){
 
 // ---------- Presto export (matches Draft Workouts HTML structure) ----------
 function buildPrestoHTML(){
+  // Presto export only: surface Re-signed at the TOP of each team's table.
+  // (On-screen board order is unchanged — this reorders the copy-paste output.)
+  const PRESTO_BUCKETS = [
+    ...BUCKETS.filter(b => b.key === 'resigned'),
+    ...BUCKETS.filter(b => b.key !== 'resigned'),
+  ];
   const L=[];
   L.push('<div class="omb-wrap" style="font-family:sans-serif;max-width:760px;margin:0 auto">');
   L.push('  <p style="margin:0 0 1em">Where every team stands heading into the 2026-27 offseason — each roster sorted by contract status. We\u2019ll update this board with every move as free agency unfolds.</p>');
@@ -508,7 +514,7 @@ function buildPrestoHTML(){
     if(!total) continue;
     L.push(`  <h3 style="margin:1.2em 0 .3em;font-size:1.1em;border-bottom:2px solid #b45309;padding-bottom:.15em">${esc(fullTeam(team))}</h3>`);
     L.push('  <table style="width:100%;border-collapse:collapse;margin:0 0 1.1em;font-size:.95em">');
-    for(const b of BUCKETS){
+    for(const b of PRESTO_BUCKETS){
       const players=t[b.key];
       if(!players.length) continue; // omit empty buckets (incl. unused change buckets)
       // right column: one player per line. note (e.g. "signed overseas") for change
