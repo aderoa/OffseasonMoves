@@ -1,8 +1,8 @@
 {
   "season": "2025-26",
   "label": "End-of-2025-26 rosters (immovable baseline)",
-  "note": "Frozen snapshot: every player who finished the 2025-26 season under contract, bucketed by 2026-27 disposition. Do not regenerate during the offseason — moves are tracked against this fixed reference.",
-  "generated": "2026-06-19T04:46:49Z",
+  "note": "Frozen snapshot: every player who finished the 2025-26 season under contract, bucketed by 2026-27 disposition. RFA = 0-3 years of service (incl. rookies). Do not regenerate during the offseason.",
+  "generated": "2026-06-20T01:10:37Z",
   "count": 529,
   "teams": {
     "Atlanta": {
@@ -76,6 +76,11 @@
           "name": "Keaton Wallace",
           "sal": 0,
           "yos": 2
+        },
+        {
+          "name": "Keshon Gilbert",
+          "sal": 0,
+          "yos": 0
         }
       ],
       "ufa": [
@@ -93,11 +98,6 @@
           "name": "Jock Landale",
           "sal": 0,
           "yos": 4
-        },
-        {
-          "name": "Keshon Gilbert",
-          "sal": 0,
-          "yos": 0
         },
         {
           "name": "Tony Bradley",
@@ -182,13 +182,14 @@
           "yos": 0
         }
       ],
-      "rfa": [],
-      "ufa": [
+      "rfa": [
         {
           "name": "John Tonje",
           "sal": 0,
           "yos": 0
-        },
+        }
+      ],
+      "ufa": [
         {
           "name": "Nikola Vucevic",
           "sal": 0,
@@ -269,6 +270,11 @@
       ],
       "rfa": [
         {
+          "name": "Chaney Johnson",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "EJ Liddell",
           "sal": 0,
           "yos": 3
@@ -289,13 +295,7 @@
           "yos": 1
         }
       ],
-      "ufa": [
-        {
-          "name": "Chaney Johnson",
-          "sal": 0,
-          "yos": 0
-        }
-      ]
+      "ufa": []
     },
     "Charlotte": {
       "under_contract": [
@@ -461,6 +461,11 @@
           "yos": 3
         },
         {
+          "name": "Lachlan Olbrich",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "Mac McClung",
           "sal": 0,
           "yos": 3
@@ -481,11 +486,6 @@
           "name": "Collin Sexton",
           "sal": 0,
           "yos": 7
-        },
-        {
-          "name": "Lachlan Olbrich",
-          "sal": 0,
-          "yos": 0
         },
         {
           "name": "Nick Richards",
@@ -677,6 +677,11 @@
           "name": "Brandon Williams",
           "sal": 0,
           "yos": 3
+        },
+        {
+          "name": "Moussa Cisse",
+          "sal": 0,
+          "yos": 0
         }
       ],
       "ufa": [
@@ -694,11 +699,6 @@
           "name": "Marvin Bagley",
           "sal": 0,
           "yos": 7
-        },
-        {
-          "name": "Moussa Cisse",
-          "sal": 0,
-          "yos": 0
         }
       ]
     },
@@ -765,6 +765,11 @@
       ],
       "rfa": [
         {
+          "name": "Curtis Jones",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "David Roddy",
           "sal": 0,
           "yos": 3
@@ -785,11 +790,6 @@
           "name": "Bruce Brown",
           "sal": 0,
           "yos": 7
-        },
-        {
-          "name": "Curtis Jones",
-          "sal": 0,
-          "yos": 0
         },
         {
           "name": "Tim Hardaway Jr",
@@ -1281,6 +1281,11 @@
           "yos": 3
         },
         {
+          "name": "Norchad Omier",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "TyTy Washington",
           "sal": 0,
           "yos": 3
@@ -1291,11 +1296,6 @@
           "name": "John Collins",
           "sal": 0,
           "yos": 8
-        },
-        {
-          "name": "Norchad Omier",
-          "sal": 0,
-          "yos": 0
         }
       ]
     },
@@ -1358,17 +1358,17 @@
       ],
       "rfa": [
         {
+          "name": "Chris Manon",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "Drew Timme",
           "sal": 0,
           "yos": 1
         }
       ],
       "ufa": [
-        {
-          "name": "Chris Manon",
-          "sal": 0,
-          "yos": 0
-        },
         {
           "name": "Jaxson Hayes",
           "sal": 0,
@@ -1574,6 +1574,11 @@
           "name": "Trevor Keels",
           "sal": 0,
           "yos": 1
+        },
+        {
+          "name": "Vladislav Goldin",
+          "sal": 0,
+          "yos": 0
         }
       ],
       "ufa": [
@@ -1581,11 +1586,6 @@
           "name": "Norman Powell",
           "sal": 0,
           "yos": 10
-        },
-        {
-          "name": "Vladislav Goldin",
-          "sal": 0,
-          "yos": 0
         }
       ]
     },
@@ -1668,17 +1668,17 @@
       ],
       "rfa": [
         {
+          "name": "Alex Antetokounmpo",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "Ousmane Dieng",
           "sal": 0,
           "yos": 3
         }
       ],
       "ufa": [
-        {
-          "name": "Alex Antetokounmpo",
-          "sal": 0,
-          "yos": 0
-        },
         {
           "name": "Thanasis Antetokounmpo",
           "sal": 0,
@@ -1865,6 +1865,16 @@
       ],
       "rfa": [
         {
+          "name": "Hunter Dickinson",
+          "sal": 0,
+          "yos": 0
+        },
+        {
+          "name": "Josh Oduro",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "Trey Alexander",
           "sal": 0,
           "yos": 1
@@ -1875,16 +1885,6 @@
           "name": "DeAndre Jordan",
           "sal": 0,
           "yos": 17
-        },
-        {
-          "name": "Hunter Dickinson",
-          "sal": 0,
-          "yos": 0
-        },
-        {
-          "name": "Josh Oduro",
-          "sal": 0,
-          "yos": 0
         }
       ]
     },
@@ -1961,6 +1961,11 @@
           "yos": 1
         },
         {
+          "name": "Mohamed Diawara",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "Trey Jemison",
           "sal": 0,
           "yos": 2
@@ -1981,11 +1986,6 @@
           "name": "Mitchell Robinson",
           "sal": 0,
           "yos": 7
-        },
-        {
-          "name": "Mohamed Diawara",
-          "sal": 0,
-          "yos": 0
         }
       ]
     },
@@ -2075,9 +2075,7 @@
           "name": "Branden Carlson",
           "sal": 0,
           "yos": 1
-        }
-      ],
-      "ufa": [
+        },
         {
           "name": "Brooks Barnhizer",
           "sal": 0,
@@ -2088,7 +2086,8 @@
           "sal": 0,
           "yos": 0
         }
-      ]
+      ],
+      "ufa": []
     },
     "Orlando": {
       "under_contract": [
@@ -2345,6 +2344,11 @@
       ],
       "rfa": [
         {
+          "name": "CJ Huntley",
+          "sal": 0,
+          "yos": 0
+        },
+        {
           "name": "Collin Gillespie",
           "sal": 0,
           "yos": 3
@@ -2353,6 +2357,11 @@
           "name": "Isaiah Livers",
           "sal": 0,
           "yos": 3
+        },
+        {
+          "name": "Koby Brea",
+          "sal": 0,
+          "yos": 0
         },
         {
           "name": "Mark Williams",
@@ -2367,19 +2376,9 @@
           "yos": 6
         },
         {
-          "name": "CJ Huntley",
-          "sal": 0,
-          "yos": 0
-        },
-        {
           "name": "Jordan Goodwin",
           "sal": 0,
           "yos": 4
-        },
-        {
-          "name": "Koby Brea",
-          "sal": 0,
-          "yos": 0
         }
       ]
     },
@@ -2463,14 +2462,14 @@
           "name": "Blake Wesley",
           "sal": 0,
           "yos": 3
-        }
-      ],
-      "ufa": [
+        },
         {
           "name": "Caleb Love",
           "sal": 0,
           "yos": 0
-        },
+        }
+      ],
+      "ufa": [
         {
           "name": "Matisse Thybulle",
           "sal": 0,
@@ -2763,9 +2762,7 @@
           "name": "AJ Lawson",
           "sal": 0,
           "yos": 3
-        }
-      ],
-      "ufa": [
+        },
         {
           "name": "Alijah Martin",
           "sal": 0,
@@ -2775,7 +2772,9 @@
           "name": "Chucky Hepburn",
           "sal": 0,
           "yos": 0
-        },
+        }
+      ],
+      "ufa": [
         {
           "name": "Garrett Temple",
           "sal": 0,
