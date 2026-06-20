@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v0.7';
+const BUILD = 'moves-board v0.8';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -285,7 +285,7 @@ function buildTeams(rows){
       else if(end==='2027' && opt.includes('TEAM')) bucket='team_option';
       else bucket='under_contract';
     } else {
-      bucket = (yos>0 && yos<=3) ? 'rfa' : 'ufa';
+      bucket = (yos>=0 && yos<=3) ? 'rfa' : 'ufa';
     }
     if(!TEAMS[team]){ TEAMS[team]={}; BUCKETS.forEach(b=>TEAMS[team][b.key]=[]); }
     TEAMS[team][bucket].push({ name, sal, yos });
@@ -315,7 +315,7 @@ function effectiveBuckets(team){
         } else if(mv.bucket==='declined'){
           // option turned down → Free Agent. RFA if ≤3 years of service, else UFA
           // (same CBA/YOS rule the baseline uses); no 2026-27 salary as a free agent.
-          const faKey = (p.yos>0 && p.yos<=3) ? 'rfa' : 'ufa';
+          const faKey = (p.yos>=0 && p.yos<=3) ? 'rfa' : 'ufa';
           out[faKey].push({ ...p, sal:0, note:mv.note, moveId:mv.id, from:k });
         } else {
           out[mv.bucket].push({ ...p, note:mv.note, moveId:mv.id, from:k });
