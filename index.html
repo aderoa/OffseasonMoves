@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.0';
+const BUILD = 'moves-board v1.1';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -420,6 +420,41 @@ function baselineBucketOf(team, name){
   return null;
 }
 
+// Resolve a user-typed team to a known team key (key, full name, or unique partial).
+function resolveTeam(input){
+  const q=(input||'').trim().toLowerCase(); if(!q) return null;
+  for(const t of teamOrder){ if(t.toLowerCase()===q) return t; }
+  for(const t of teamOrder){ if(fullTeam(t).toLowerCase()===q) return t; }
+  const hits=teamOrder.filter(t=>fullTeam(t).toLowerCase().includes(q));
+  return hits.length===1 ? hits[0] : null;
+}
+// Create the matching side of a trade on another team (reclassify if that player
+// is on its baseline, else a manual entry). De-dupes; links via pairId.
+function addPaired(team, name, bucket, note, pairId){
+  if(MOVES.some(m=>m.team===team && m.name===name && m.bucket===bucket)) return;
+  const isBaseline=!!baselineBucketOf(team,name);
+  const ex=isBaseline?moveFor(team,name):null;
+  if(ex){ ex.bucket=bucket; ex.note=note; ex.pairId=pairId; }
+  else MOVES.push({ id:genId(), team, name, bucket, note, manual:!isBaseline, pairId });
+}
+// After logging a Left/Added, optionally mirror it on the other team (trade/signing).
+function maybePair(srcMove, name, team, bucket){
+  if(bucket!=='left' && bucket!=='added') return;
+  const other = bucket==='left' ? 'added' : 'left';
+  const otherLabel = other==='added' ? 'Added' : 'Left';
+  const dirWord = bucket==='left' ? 'go TO' : 'come FROM';
+  const ans = prompt(`Did ${name} ${dirWord} another team (trade / signing)?\n\nType that team (name or abbreviation) to add the matching "${otherLabel}" entry there.\nLeave blank if not (free agency, waived, overseas).`, '');
+  if(ans===null || !ans.trim()) return;
+  const dest = resolveTeam(ans.trim());
+  if(!dest){ alert('Team not recognized or ambiguous: "'+ans.trim()+'". Skipped the paired entry \u2014 add it manually if needed.'); return; }
+  if(dest===team) return;
+  const pid = 'p'+genId();
+  if(srcMove) srcMove.pairId = pid;
+  const noteTxt = bucket==='left' ? ('from '+fullTeam(team)) : ('to '+fullTeam(team));
+  addPaired(dest, name, other, noteTxt, pid);
+  toast(`${name} also \u2192 ${fullTeam(dest)} (${otherLabel})`);
+}
+
 // Reclassify an existing baseline player into a change bucket.
 function logMove(team, name){
   const existing = moveFor(team, name);
@@ -428,13 +463,19 @@ function logMove(team, name){
   const bucket = pickBucket(`Log a move for ${name} (${fullTeam(team)})`, existing?existing.bucket:'', isOption, !!existing);
   if(!bucket) return;
   if(bucket==='clear'){
-    if(existing){ MOVES = MOVES.filter(m=>m!==existing); saveMoves(); render(); toast(`${name} → cleared`); }
+    if(existing){
+      const ids = existing.pairId ? MOVES.filter(x=>x.pairId===existing.pairId).map(x=>x.id) : [existing.id];
+      MOVES = MOVES.filter(m=>!ids.includes(m.id));
+      saveMoves(); render(); toast(`${name} → cleared`);
+    }
     return;
   }
   const note = prompt('Optional note (e.g. "traded to Miami", "signed overseas — Olympiacos"). Leave blank for none:', existing?existing.note||'':'');
   if(note===null) return;
-  if(existing){ existing.bucket=bucket; existing.note=note.trim(); }
-  else MOVES.push({ id:genId(), team, name, bucket, note:note.trim(), manual:false });
+  let src;
+  if(existing){ existing.bucket=bucket; existing.note=note.trim(); src=existing; }
+  else { src={ id:genId(), team, name, bucket, note:note.trim(), manual:false }; MOVES.push(src); }
+  maybePair(src, name, team, bucket);
   saveMoves(); render();
   const outLabel = bucket==='exercised' ? 'Under Contract' : bucket==='declined' ? 'Free Agents' : PRESTO_LABEL[bucket];
   toast(`${name} → ${outLabel}`);
@@ -454,14 +495,17 @@ function addManual(team){
   if(!bucket) return;
   const note = prompt('Optional note (e.g. pick number, "from trade with PHX", "two-way"). Leave blank for none:', '');
   if(note===null) return;
-  MOVES.push({ id:genId(), team, name:name.trim(), bucket, note:note.trim(), manual:true });
+  const src={ id:genId(), team, name:name.trim(), bucket, note:note.trim(), manual:true };
+  MOVES.push(src);
+  maybePair(src, name.trim(), team, bucket);
   saveMoves(); render();
   toast(`${name.trim()} added → ${PRESTO_LABEL[bucket]}`);
 }
 
 function undoMove(id){
   const m = MOVES.find(x=>x.id===id); if(!m) return;
-  MOVES = MOVES.filter(x=>x.id!==id);
+  const ids = m.pairId ? MOVES.filter(x=>x.pairId===m.pairId).map(x=>x.id) : [m.id];
+  MOVES = MOVES.filter(x=>!ids.includes(x.id));
   saveMoves(); render();
   toast(`Reverted ${m.name}`);
 }
