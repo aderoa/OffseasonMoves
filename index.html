@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.3';
+const BUILD = 'moves-board v1.4';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -571,14 +571,16 @@ function buildPrestoHTML(){
     for(const b of PRESTO_BUCKETS){
       const players=t[b.key];
       if(!players.length) continue; // omit empty buckets (incl. unused change buckets)
-      // right column: one player per line. note (e.g. "signed overseas") for change
-      // buckets, salary for baseline buckets.
+      // right column: one player per line. Each player is a block-level <div> (not a
+      // <br>-separated run) because Presto strips <br> inside table cells, collapsing
+      // everyone onto one line. note (e.g. "signed overseas") for change buckets,
+      // salary for baseline buckets.
       const lines = players.map(p=>{
         const meta = fmtMeta(p);
         const detail = p.note ? p.note : (meta || '');
         const detailSpan = detail ? ` <span style="color:#666;font-size:.9em">(${esc(detail)})</span>` : '';
-        return `${esc(p.name)}${detailSpan}`;
-      }).join('<br>');
+        return `<div style="margin:0">${esc(p.name)}${detailSpan}</div>`;
+      }).join('');
       // left column = bucket header; right column = players
       L.push('    <tr>');
       L.push(`      <td style="vertical-align:top;white-space:nowrap;padding:.5em .9em .5em 0;border-top:1px solid #eee;color:#b45309;font-weight:bold">${PRESTO_LABEL[b.key]} <span style="color:#999;font-weight:normal">(${players.length})</span></td>`);
