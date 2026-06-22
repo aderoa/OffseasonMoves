@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.1';
+const BUILD = 'moves-board v1.2';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -383,7 +383,8 @@ function liFor(team, bucketKey, p){
   const noteTag = p.note ? `<span class="note">${esc(p.note)}</span>` : '';
   let action;
   if(isChange){
-    action = `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
+    action = `<button class="li-act edit" title="Edit note" onclick="editNote('${p.moveId}')">\u270e</button>`
+           + `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
   } else {
     action = `<button class="li-act" title="Log a move for ${esc(p.name)}" onclick="logMove('${jsArg(team)}','${jsArg(p.name)}')">⋯</button>`;
   }
@@ -502,6 +503,13 @@ function addManual(team){
   toast(`${name.trim()} added → ${PRESTO_LABEL[bucket]}`);
 }
 
+function editNote(moveId){
+  const m = MOVES.find(x=>x.id===moveId); if(!m) return;
+  const note = prompt(`Note for ${m.name} (${PRESTO_LABEL[m.bucket]||m.bucket}):`, m.note||'');
+  if(note===null) return;
+  m.note = note.trim(); saveMoves(); render();
+  toast(`Note updated \u2014 ${m.name}`);
+}
 function undoMove(id){
   const m = MOVES.find(x=>x.id===id); if(!m) return;
   const ids = m.pairId ? MOVES.filter(x=>x.pairId===m.pairId).map(x=>x.id) : [m.id];
@@ -543,12 +551,13 @@ function toggleAll(){
 
 // ---------- Presto export (matches Draft Workouts HTML structure) ----------
 function buildPrestoHTML(){
-  // Presto export only: Re-signed first, then Extended, then everything else.
+  // Presto export only: Re-signed, then Extended, then Added, then everything else.
   // (On-screen board order is unchanged — this reorders the copy-paste output.)
   const PRESTO_BUCKETS = [
     ...BUCKETS.filter(b => b.key === 'resigned'),
     ...BUCKETS.filter(b => b.key === 'extended'),
-    ...BUCKETS.filter(b => b.key !== 'resigned' && b.key !== 'extended'),
+    ...BUCKETS.filter(b => b.key === 'added'),
+    ...BUCKETS.filter(b => !['resigned','extended','added'].includes(b.key)),
   ];
   const L=[];
   L.push('<div class="omb-wrap" style="font-family:sans-serif;max-width:760px;margin:0 auto">');
