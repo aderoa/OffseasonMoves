@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.4';
+const BUILD = 'moves-board v1.5';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -170,6 +170,18 @@ const TEAM_NAMES = {
   'Toronto':'Toronto Raptors', 'Utah':'Utah Jazz', 'Washington':'Washington Wizards'
 };
 function fullTeam(t){ return TEAM_NAMES[t] || t; }
+// Draft TEAM column uses abbreviations; the board keys on short names.
+const ABBR_TO_KEY = {
+  ATL:'Atlanta', BOS:'Boston', BKN:'Brooklyn', BRK:'Brooklyn', CHA:'Charlotte', CHO:'Charlotte',
+  CHI:'Chicago', CLE:'Cleveland', DAL:'Dallas', DEN:'Denver', DET:'Detroit',
+  GSW:'Golden State', GS:'Golden State', HOU:'Houston', IND:'Indiana',
+  LAC:'LA Clippers', LAL:'LA Lakers', MEM:'Memphis', MIA:'Miami', MIL:'Milwaukee',
+  MIN:'Minnesota', NOP:'New Orleans', NO:'New Orleans', NYK:'New York', NY:'New York',
+  OKC:'Oklahoma City', ORL:'Orlando', PHI:'Philadelphia', PHX:'Phoenix', PHO:'Phoenix',
+  POR:'Portland', SAC:'Sacramento', SAS:'San Antonio', SA:'San Antonio', TOR:'Toronto',
+  UTA:'Utah', UTAH:'Utah', WAS:'Washington', WSH:'Washington'
+};
+let DRAFTPICKS = {};   // teamKey -> [ {name, pick} ]  (auto first-round picks)
 
 let TEAMS = {};        // teamName -> { bucketKey: [players] } (BASELINE, from data)
 let teamOrder = [];
@@ -210,6 +222,28 @@ function parseCSV(text){
 function num(v){ const n=parseInt(String(v||'').replace(/[^0-9-]/g,'')); return isNaN(n)?0:n; }
 
 // ---------- load + bucket ----------
+// Pull the first-round draft picks (DRAFTEE column, cols: 15=pick, 16=team, 17=draftee)
+// and bucket each under its owning team's "Drafted" category. Same live tab the
+// Depth Charts read; never throws (board still works if the draft feed is down).
+async function loadDraftPicks(force){
+  DRAFTPICKS = {};
+  try{
+    const resp = await fetch(`${API_BASE}/api/draft-csv` + (force?'?nocache':''));
+    if(!resp.ok) return;
+    const rows = parseCSV(await resp.text());
+    for(let i=1;i<rows.length;i++){
+      const r = rows[i];
+      const pick = parseInt((r[15]||'').trim());
+      if(!(pick>=1 && pick<=30)) continue;              // first round only
+      const name = (r[17]||'').trim();
+      if(!name) continue;                               // pick not made yet
+      const key = ABBR_TO_KEY[(r[16]||'').trim().toUpperCase()];
+      if(!key) continue;
+      (DRAFTPICKS[key] = DRAFTPICKS[key] || []).push({ name, pick });
+    }
+  }catch(_){}
+}
+
 async function load(force){
   try{
     // Immovable baseline first: the frozen end-of-2025-26 snapshot (baseline.json,
@@ -230,6 +264,7 @@ async function load(force){
       if(rows.length<2) throw new Error('no rows');
       buildTeams(rows);
     }
+    await loadDraftPicks(force);
     loadMoves();
     render();
   }catch(e){
@@ -327,8 +362,17 @@ function effectiveBuckets(team){
   for(const m of MOVES){
     if(m.manual && m.team===team) out[m.bucket].push({ name:m.name, sal:0, note:m.note, moveId:m.id, manual:true, extra:m.extra });
   }
+  // auto first-round draft picks (not user moves; de-duped against logged drafted)
+  if(DRAFTPICKS[team] && DRAFTPICKS[team].length){
+    const seenD = new Set(out['drafted'].map(p=>p.name));
+    for(const dp of DRAFTPICKS[team]){
+      if(seenD.has(dp.name)) continue; seenD.add(dp.name);
+      out['drafted'].push({ name:dp.name, sal:0, pick:dp.pick, note:'#'+dp.pick, auto:true });
+    }
+  }
   // keep every bucket in salary order so merged-in players land in the right spot
   Object.keys(out).forEach(k=> out[k].sort((a,z)=> (z.sal||0)-(a.sal||0) || a.name.localeCompare(z.name)));
+  if(out['drafted'].length) out['drafted'].sort((a,z)=> (a.pick||999)-(z.pick||999) || a.name.localeCompare(z.name));
   return out;
 }
 
@@ -383,8 +427,10 @@ function liFor(team, bucketKey, p){
   const noteTag = p.note ? `<span class="note">${esc(p.note)}</span>` : '';
   let action;
   if(isChange){
-    action = `<button class="li-act edit" title="Edit note" onclick="editNote('${p.moveId}')">\u270e</button>`
-           + `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
+    action = p.moveId
+      ? `<button class="li-act edit" title="Edit note" onclick="editNote('${p.moveId}')">\u270e</button>`
+        + `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`
+      : '';  // auto-injected (e.g. first-round draft pick) — managed from the sheet
   } else {
     action = `<button class="li-act" title="Log a move for ${esc(p.name)}" onclick="logMove('${jsArg(team)}','${jsArg(p.name)}')">⋯</button>`;
   }
@@ -555,9 +601,10 @@ function buildPrestoHTML(){
   // (On-screen board order is unchanged — this reorders the copy-paste output.)
   const PRESTO_BUCKETS = [
     ...BUCKETS.filter(b => b.key === 'added'),
+    ...BUCKETS.filter(b => b.key === 'drafted'),
     ...BUCKETS.filter(b => b.key === 'resigned'),
     ...BUCKETS.filter(b => b.key === 'extended'),
-    ...BUCKETS.filter(b => !['added','resigned','extended'].includes(b.key)),
+    ...BUCKETS.filter(b => !['added','drafted','resigned','extended'].includes(b.key)),
   ];
   const L=[];
   L.push('<div class="omb-wrap" style="font-family:sans-serif;max-width:760px;margin:0 auto">');
