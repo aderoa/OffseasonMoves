@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.6';
+const BUILD = 'moves-board v1.7';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -153,7 +153,7 @@ const CHANGE_KEYS = CHANGE_BUCKETS.map(b=>b.key);
 const PRESTO_LABEL = {
   under_contract:'Under Contract', player_option:'Player Options', team_option:'Team Options',
   rfa:'Restricted Free Agents', ufa:'Unrestricted Free Agents',
-  added:'Added', resigned:'Re-signed', extended:'Extended', drafted:'Drafted', left:'Left'
+  added:'Added', resigned:'Re-signed', extended:'Extended', drafted:'Drafted', left:'Left', waived:'Waived'
 };
 
 // Full official team names, keyed by the short name used in the contracts data.
@@ -352,6 +352,10 @@ function effectiveBuckets(team){
           // (same CBA/YOS rule the baseline uses); no 2026-27 salary as a free agent.
           const faKey = (p.yos>=0 && p.yos<=3) ? 'rfa' : 'ufa';
           out[faKey].push({ ...p, sal:0, note:mv.note, moveId:mv.id, from:k });
+        } else if(mv.bucket==='waived'){
+          // waived → straight to unrestricted free agency (always UFA, never RFA),
+          // no 2026-27 salary. Default the note to "waived" so it's clear why.
+          out['ufa'].push({ ...p, sal:0, note:mv.note||'waived', moveId:mv.id, from:k, waived:true });
         } else {
           out[mv.bucket].push({ ...p, note:mv.note, moveId:mv.id, from:k });
         }
@@ -445,12 +449,13 @@ function jsArg(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").re
 const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
 
 function pickBucket(promptLabel, dflt, isOption, hasMove){
-  let opts = isOption ? ['exercised','declined','added','resigned','extended','left']
-                      : ['added','resigned','extended','left'];
+  let opts = isOption ? ['exercised','declined','added','resigned','extended','left','waived']
+                      : ['added','resigned','extended','left','waived'];
   if(hasMove) opts = opts.concat('clear');
-  const head = isOption
-    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\n\nType one of: ' + opts.join(', ')
-    : '\n\nType one of: ' + opts.join(', ');
+  const head = (isOption
+    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\nwaived = waived (→ Unrestricted Free Agent)'
+    : '\n\nwaived = waived (→ Unrestricted Free Agent)')
+    + '\n\nType one of: ' + opts.join(', ');
   const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
   const k = ans.trim().toLowerCase();
@@ -524,7 +529,7 @@ function logMove(team, name){
   else { src={ id:genId(), team, name, bucket, note:note.trim(), manual:false }; MOVES.push(src); }
   maybePair(src, name, team, bucket);
   saveMoves(); render();
-  const outLabel = bucket==='exercised' ? 'Under Contract' : bucket==='declined' ? 'Free Agents' : PRESTO_LABEL[bucket];
+  const outLabel = bucket==='exercised' ? 'Under Contract' : (bucket==='declined'||bucket==='waived') ? 'Unrestricted FAs' : PRESTO_LABEL[bucket];
   toast(`${name} → ${outLabel}`);
 }
 
