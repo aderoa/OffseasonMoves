@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.7';
+const BUILD = 'moves-board v1.8';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -300,8 +300,8 @@ function applyBaseline(data){
 }
 
 function buildTeams(rows){
-  // column map (verified against contracts sheet): 0 name, 2 team, 10 = 2026-27 salary,
-  // 26 OPTION, 27 END, 38 YOS
+  // column map (verified against contracts sheet): 0 name, 2 team, 9 ST 25-26,
+  // 10 = 2026-27 salary, 26 OPTION, 27 END, 31 EXCEPTION, 38 YOS
   TEAMS = {};
   for(let i=1;i<rows.length;i++){
     const r=rows[i]; if(!r) continue;
@@ -311,6 +311,13 @@ function buildTeams(rows){
     const sal=num(r[10]);          // 2026-27 salary
     const yos=num(r[38]);
     const end=(r[27]||'').trim();  // contract end year
+    // Restricted vs unrestricted is a CONTRACT-TYPE question, not a YOS one:
+    // a player coming off a rookie-scale deal (or a two-way) is RFA; everyone
+    // else (incl. minimum-salary vets like a 4-yr Sochan) is UFA. Matches Depth
+    // Charts. YOS<=4 guards stale "Rookie Exception" tags on long-tenured vets.
+    const exc=(r[31]||'').toLowerCase();
+    const st2526=(r[9]||'').trim().toUpperCase();
+    const rookie=(/rookie/.test(exc) && yos<=4) || st2526==='TWO-WAY';
     let bucket;
     if(sal>0){
       // Under contract for 2026-27. The option only matters for THIS board when the
@@ -320,10 +327,10 @@ function buildTeams(rows){
       else if(end==='2027' && opt.includes('TEAM')) bucket='team_option';
       else bucket='under_contract';
     } else {
-      bucket = (yos>=0 && yos<=3) ? 'rfa' : 'ufa';
+      bucket = rookie ? 'rfa' : 'ufa';
     }
     if(!TEAMS[team]){ TEAMS[team]={}; BUCKETS.forEach(b=>TEAMS[team][b.key]=[]); }
-    TEAMS[team][bucket].push({ name, sal, yos });
+    TEAMS[team][bucket].push({ name, sal, yos, rookie });
   }
   // sort each bucket by salary desc then name; team order alphabetical
   Object.values(TEAMS).forEach(t=>BUCKETS.forEach(b=>
@@ -348,9 +355,10 @@ function effectiveBuckets(team){
           // option picked up → Under Contract (keep the 2026-27 salary)
           out['under_contract'].push({ ...p, note:mv.note, moveId:mv.id, from:k });
         } else if(mv.bucket==='declined'){
-          // option turned down → Free Agent. RFA if ≤3 years of service, else UFA
-          // (same CBA/YOS rule the baseline uses); no 2026-27 salary as a free agent.
-          const faKey = (p.yos>=0 && p.yos<=3) ? 'rfa' : 'ufa';
+          // option turned down → Free Agent. RFA only if coming off a rookie-scale
+          // deal (or two-way); else UFA — same rule the baseline uses. No 2026-27
+          // salary as a free agent.
+          const faKey = p.rookie ? 'rfa' : 'ufa';
           out[faKey].push({ ...p, sal:0, note:mv.note, moveId:mv.id, from:k });
         } else if(mv.bucket==='waived'){
           // waived → straight to unrestricted free agency (always UFA, never RFA),
