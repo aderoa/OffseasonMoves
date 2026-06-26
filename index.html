@@ -122,7 +122,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.8';
+const BUILD = 'moves-board v1.9';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -318,6 +318,9 @@ function buildTeams(rows){
     const exc=(r[31]||'').toLowerCase();
     const st2526=(r[9]||'').trim().toUpperCase();
     const rookie=(/rookie/.test(exc) && yos<=4) || st2526==='TWO-WAY';
+    // Restricted if rookie-scale/two-way OR <=3 years of service (the experience
+    // path: a short-tenured vet like a 2-yr Hukporti gets a QO → RFA).
+    const rfaElig = rookie || (yos>=0 && yos<=3);
     let bucket;
     if(sal>0){
       // Under contract for 2026-27. The option only matters for THIS board when the
@@ -327,10 +330,10 @@ function buildTeams(rows){
       else if(end==='2027' && opt.includes('TEAM')) bucket='team_option';
       else bucket='under_contract';
     } else {
-      bucket = rookie ? 'rfa' : 'ufa';
+      bucket = rfaElig ? 'rfa' : 'ufa';
     }
     if(!TEAMS[team]){ TEAMS[team]={}; BUCKETS.forEach(b=>TEAMS[team][b.key]=[]); }
-    TEAMS[team][bucket].push({ name, sal, yos, rookie });
+    TEAMS[team][bucket].push({ name, sal, yos, rookie, rfaElig });
   }
   // sort each bucket by salary desc then name; team order alphabetical
   Object.values(TEAMS).forEach(t=>BUCKETS.forEach(b=>
@@ -355,10 +358,9 @@ function effectiveBuckets(team){
           // option picked up → Under Contract (keep the 2026-27 salary)
           out['under_contract'].push({ ...p, note:mv.note, moveId:mv.id, from:k });
         } else if(mv.bucket==='declined'){
-          // option turned down → Free Agent. RFA only if coming off a rookie-scale
-          // deal (or two-way); else UFA — same rule the baseline uses. No 2026-27
-          // salary as a free agent.
-          const faKey = p.rookie ? 'rfa' : 'ufa';
+          // option turned down → Free Agent. RFA if rookie-scale/two-way or <=3
+          // YOS (same rule the baseline uses); else UFA. No 2026-27 salary as FA.
+          const faKey = (p.rfaElig !== undefined ? p.rfaElig : p.rookie) ? 'rfa' : 'ufa';
           out[faKey].push({ ...p, sal:0, note:mv.note, moveId:mv.id, from:k });
         } else if(mv.bucket==='waived'){
           // waived → straight to unrestricted free agency (always UFA, never RFA),
