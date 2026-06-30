@@ -299,7 +299,7 @@ function applyBaseline(data){
   teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
 }
 
-function _isUFAOverride(nm){if(!_isUFAOverride._s){_isUFAOverride._s=new Set("tosan evbuomwan|keaton wallace|max shulga|jordan walsh|amari williams|john tonje|ochai agbaji|jalen wilson|tyson etienne|ej liddell|antonio reeves|mac mcclung|yuki kawamura|lachlan olbrich|olivier sarr|jalen pickett|curtis jones|pat spencer|jeenathan williams|norchad omier|drew timme|rayan rupert|keshad johnson|trevor keels|jahmir young|ousmane dieng|andre jackson|alex antetokounmpo|julian phillips|trey alexander|josh oduro|ariel hukporti|kevin mccullar|trey jemison|branden carlson|tyrese martin|isaiah livers|caleb love|jonathan mogbo|elijah harkless|oscar tshiebwe|sharife cooper|nick smith|jamir watkins".split("|"));}var n=(nm||'').toLowerCase().replace(/[.'`]/g,'').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/\s+/g,' ').trim();return _isUFAOverride._s.has(n);}
+function _isRFAList(nm){if(!_isRFAList._s){_isRFAList._s=new Set("moussa cisse|spencer jones|peyton watson|jalen duren|quinten post|tari eason|isaiah crawford|jalen slawson|bennedict mathurin|jordan miller|kobe sanders|chris manon|vladislav goldin|jaylen clark|enrique freeman|hunter dickinson|brooks barnhizer|colin castleton|mark williams|koby brea|daeqwon plowden|harrison ingram|david jones|david jones garcia|alijah martin|walker kessler".split("|"));}var n=(nm||'').toLowerCase().replace(/[.'`]/g,'').replace(/-/g,' ').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/\s+/g,' ').trim();return _isRFAList._s.has(n);}
 function buildTeams(rows){
   // column map (verified against contracts sheet): 0 name, 2 team, 9 ST 25-26,
   // 10 = 2026-27 salary, 26 OPTION, 27 END, 31 EXCEPTION, 38 YOS
@@ -321,7 +321,7 @@ function buildTeams(rows){
     const rookie=(/rookie/.test(exc) && yos<=4) || st2526==='TWO-WAY';
     // Restricted if rookie-scale/two-way OR <=3 years of service (the experience
     // path: a short-tenured vet like a 2-yr Hukporti gets a QO → RFA).
-    const rfaElig = (rookie || (yos>=0 && yos<=3)) && !_isUFAOverride(name);
+    const rfaElig = _isRFAList(name);
     let bucket;
     if(sal>0){
       // Under contract for 2026-27. The option only matters for THIS board when the
