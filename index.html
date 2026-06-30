@@ -305,7 +305,7 @@ function applyBaseline(data){
   teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
 }
 
-function _isRFAList(nm){if(!_isRFAList._s){_isRFAList._s=new Set("moussa cisse|spencer jones|peyton watson|jalen duren|quinten post|tari eason|isaiah crawford|jalen slawson|bennedict mathurin|jordan miller|kobe sanders|chris manon|vladislav goldin|jaylen clark|enrique freeman|hunter dickinson|brooks barnhizer|colin castleton|mark williams|koby brea|daeqwon plowden|harrison ingram|david jones|david jones garcia|alijah martin|walker kessler".split("|"));}var n=(nm||'').toLowerCase().replace(/[.'`]/g,'').replace(/-/g,' ').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/\s+/g,' ').trim();return _isRFAList._s.has(n);}
+function _isRFAList(nm){if(!_isRFAList._s){_isRFAList._s=new Set("moussa cisse|spencer jones|peyton watson|jalen duren|quinten post|tari eason|isaiah crawford|jalen slawson|bennedict mathurin|jordan miller|kobe sanders|chris manon|vladislav goldin|jaylen clark|enrique freeman|hunter dickinson|brooks barnhizer|colin castleton|mark williams|koby brea|daeqwon plowden|harrison ingram|david jones|david jones garcia|alijah martin|walker kessler|jamir watkins".split("|"));}var n=(nm||'').toLowerCase().replace(/[.'`]/g,'').replace(/-/g,' ').replace(/\b(jr|sr|ii|iii|iv)\b/g,'').replace(/\s+/g,' ').trim();return _isRFAList._s.has(n);}
 function buildTeams(rows){
   // column map (verified against contracts sheet): 0 name, 2 team, 9 ST 25-26,
   // 10 = 2026-27 salary, 26 OPTION, 27 END, 31 EXCEPTION, 38 YOS
