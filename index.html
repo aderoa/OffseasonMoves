@@ -294,6 +294,12 @@ function applyBaseline(data){
   for(const team in teams){
     TEAMS[team] = {};
     BUCKETS.forEach(b=> TEAMS[team][b.key] = Array.isArray(teams[team][b.key]) ? teams[team][b.key].slice() : []);
+    // Restricted whitelist overrides the frozen snapshot: stamp every player, then
+    // re-split the FA buckets so only whitelisted players are RFA; all others are UFA.
+    BUCKETS.forEach(b=> TEAMS[team][b.key].forEach(p=> p.rfaElig = _isRFAList(p.name)));
+    const fa = TEAMS[team]['rfa'].concat(TEAMS[team]['ufa']);
+    TEAMS[team]['rfa'] = fa.filter(p=> p.rfaElig);
+    TEAMS[team]['ufa'] = fa.filter(p=> !p.rfaElig);
     BUCKETS.forEach(b=> TEAMS[team][b.key].sort((a,z)=> z.sal-a.sal || a.name.localeCompare(z.name)));
   }
   teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
