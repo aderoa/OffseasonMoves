@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- BUILD 2026-07-01 · drafted picks can be signed → Added (logDraftMove); pick placeholder suppressed once a move is logged -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -386,7 +387,9 @@ function effectiveBuckets(team){
   // auto first-round draft picks (not user moves; de-duped against logged drafted)
   if(DRAFTPICKS[team] && DRAFTPICKS[team].length){
     const seenD = new Set(out['drafted'].map(p=>p.name));
+    const movedD = new Set(MOVES.filter(m=>m.team===team).map(m=>m.name.toLowerCase()));
     for(const dp of DRAFTPICKS[team]){
+      if(movedD.has(dp.name.toLowerCase())) continue;   // user logged a move (e.g. signed → Added) → drop the pick placeholder
       if(seenD.has(dp.name)) continue; seenD.add(dp.name);
       out['drafted'].push({ name:dp.name, sal:0, pick:dp.pick, note:'#'+dp.pick, auto:true });
     }
@@ -448,10 +451,15 @@ function liFor(team, bucketKey, p){
   const noteTag = p.note ? `<span class="note">${esc(p.note)}</span>` : '';
   let action;
   if(isChange){
-    action = p.moveId
-      ? `<button class="li-act edit" title="Edit note" onclick="editNote('${p.moveId}')">\u270e</button>`
-        + `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`
-      : '';  // auto-injected (e.g. first-round draft pick) — managed from the sheet
+    if(p.moveId){
+      action = `<button class="li-act edit" title="Edit note" onclick="editNote('${p.moveId}')">\u270e</button>`
+        + `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
+    } else if(p.auto){
+      // auto draft pick: let the user sign it (→ Added) or otherwise reclassify
+      action = `<button class="li-act" title="Sign / log a move for ${esc(p.name)}" onclick="logDraftMove('${jsArg(team)}','${jsArg(p.name)}',${p.pick||0})">⋯</button>`;
+    } else {
+      action = '';  // auto-injected non-draft entry — managed from the sheet
+    }
   } else {
     action = `<button class="li-act" title="Log a move for ${esc(p.name)}" onclick="logMove('${jsArg(team)}','${jsArg(p.name)}')">⋯</button>`;
   }
@@ -548,6 +556,21 @@ function logMove(team, name){
   saveMoves(); render();
   const outLabel = bucket==='exercised' ? 'Under Contract' : (bucket==='declined'||bucket==='waived') ? 'Unrestricted FAs' : PRESTO_LABEL[bucket];
   toast(`${name} → ${outLabel}`);
+}
+
+// Sign / reclassify an AUTO draft pick (drafted rookie). Defaults to Added (signed);
+// creates a manual move so the pick placeholder is replaced by the real signing.
+function logDraftMove(team, name, pick){
+  const bucket = pickBucket(`${name} (drafted${pick?' #'+pick:''}, ${fullTeam(team)}) \u2014 log a move`, 'added', false, false);
+  if(!bucket) return;
+  const note = prompt('Optional note (contract terms, "two-way", pick #, etc.). Leave blank for none:', pick?('#'+pick):'');
+  if(note===null) return;
+  MOVES = MOVES.filter(m=>!(m.team===team && m.name===name));   // clear any prior entry for this player
+  const src={ id:genId(), team, name, bucket, note:note.trim(), manual:true };
+  MOVES.push(src);
+  maybePair(src, name, team, bucket);
+  saveMoves(); render();
+  toast(`${name} \u2192 ${PRESTO_LABEL[bucket]}`);
 }
 
 // Add a player not in the data: Drafted rookie, or an incoming Added player.
