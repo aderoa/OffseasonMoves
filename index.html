@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD 2026-07-01b · drafted picks -> Added (logDraftMove); ROSTER_OVERRIDES layer (Keshon Gilbert -> ATL Under Contract) -->
+<!-- BUILD 2026-07-01b · drafted picks -> Added (logDraftMove); ROSTER_OVERRIDES layer; 'under contract' added to log-a-move -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -500,16 +500,16 @@ function jsArg(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").re
 const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
 
 function pickBucket(promptLabel, dflt, isOption, hasMove){
-  let opts = isOption ? ['exercised','declined','added','resigned','extended','left','waived']
-                      : ['added','resigned','extended','left','waived'];
+  let opts = isOption ? ['exercised','declined','under_contract','added','resigned','extended','left','waived']
+                      : ['under_contract','added','resigned','extended','left','waived'];
   if(hasMove) opts = opts.concat('clear');
   const head = (isOption
-    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\nwaived = waived (→ Unrestricted Free Agent)'
-    : '\n\nwaived = waived (→ Unrestricted Free Agent)')
+    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\nunder_contract = keep on roster (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)'
+    : '\n\nunder_contract = keep / rostered (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)')
     + '\n\nType one of: ' + opts.join(', ');
   const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
-  const k = ans.trim().toLowerCase();
+  const k = ans.trim().toLowerCase().replace(/\s+/g,'_');   // "under contract" -> "under_contract"
   if(!k && dflt) return dflt;
   if(opts.includes(k)) return k;
   alert('Unrecognized category. Use: ' + opts.join(', ') + '.');
