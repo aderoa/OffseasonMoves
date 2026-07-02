@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD 2026-07-01 · drafted picks can be signed → Added (logDraftMove); pick placeholder suppressed once a move is logged -->
+<!-- BUILD 2026-07-01b · drafted picks -> Added (logDraftMove); ROSTER_OVERRIDES layer (Keshon Gilbert -> ATL Under Contract) -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -265,6 +265,7 @@ async function load(force){
       if(rows.length<2) throw new Error('no rows');
       buildTeams(rows);
     }
+    applyRosterOverrides();   // correct known data errors before rendering
     await loadDraftPicks(force);
     loadMoves();
     render();
@@ -303,6 +304,31 @@ function applyBaseline(data){
     TEAMS[team]['ufa'] = fa.filter(p=> !p.rfaElig);
     BUCKETS.forEach(b=> TEAMS[team][b.key].sort((a,z)=> z.sal-a.sal || a.name.localeCompare(z.name)));
   }
+  teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
+}
+
+// Manual corrections for known data errors in the baseline/contracts feed. Each entry
+// moves a player to the given team + bucket, removing them from wherever the data put
+// them. Add rows here as issues surface. bucket = under_contract | player_option |
+// team_option | rfa | ufa (see BASE_BUCKETS).
+const ROSTER_OVERRIDES = [
+  { name:'Keshon Gilbert', team:'ATL', bucket:'under_contract' },
+];
+function applyRosterOverrides(){
+  ROSTER_OVERRIDES.forEach(o=>{
+    let player=null;
+    for(const tm in TEAMS){
+      BUCKETS.forEach(b=>{ const arr=TEAMS[tm][b.key]; if(!arr) return;
+        for(let i=arr.length-1;i>=0;i--){ if(arr[i].name===o.name){ player=player||arr[i]; arr.splice(i,1); } }
+      });
+    }
+    if(!TEAMS[o.team]){ TEAMS[o.team]={}; BUCKETS.forEach(b=>TEAMS[o.team][b.key]=[]); }
+    if(!TEAMS[o.team][o.bucket]) TEAMS[o.team][o.bucket]=[];
+    const p = player || { name:o.name, sal:0, yos:0, rookie:false };
+    p.rfaElig = _isRFAList(p.name);
+    TEAMS[o.team][o.bucket].push(p);
+    TEAMS[o.team][o.bucket].sort((a,z)=> (z.sal||0)-(a.sal||0) || a.name.localeCompare(z.name));
+  });
   teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
 }
 
