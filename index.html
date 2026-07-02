@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD 2026-07-01b · drafted picks -> Added (logDraftMove); ROSTER_OVERRIDES layer; 'under contract' added to log-a-move -->
+<!-- BUILD 2026-07-01b · v2.0 · ROSTER_OVERRIDES (Keshon Gilbert->ATL UC); 'under contract' in log-a-move -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -123,7 +123,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v1.9';
+const BUILD = 'moves-board v2.0';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -308,9 +308,8 @@ function applyBaseline(data){
 }
 
 // Manual corrections for known data errors in the baseline/contracts feed. Each entry
-// moves a player to the given team + bucket, removing them from wherever the data put
-// them. Add rows here as issues surface. bucket = under_contract | player_option |
-// team_option | rfa | ufa (see BASE_BUCKETS).
+// moves a player to the given team + bucket. bucket = under_contract | player_option |
+// team_option | rfa | ufa.
 const ROSTER_OVERRIDES = [
   { name:'Keshon Gilbert', team:'ATL', bucket:'under_contract' },
 ];
@@ -509,7 +508,7 @@ function pickBucket(promptLabel, dflt, isOption, hasMove){
     + '\n\nType one of: ' + opts.join(', ');
   const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
-  const k = ans.trim().toLowerCase().replace(/\s+/g,'_');   // "under contract" -> "under_contract"
+  const k = ans.trim().toLowerCase().replace(/\s+/g,'_');
   if(!k && dflt) return dflt;
   if(opts.includes(k)) return k;
   alert('Unrecognized category. Use: ' + opts.join(', ') + '.');
