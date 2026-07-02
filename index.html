@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD 2026-07-01b · v2.3 · ROSTER_OVERRIDES (Keshon Gilbert->ATL UC); 'under contract' in log-a-move -->
+<!-- BUILD 2026-07-01c · v2.4 · CLEAN ROLLBACK to v1.9 + 'under contract' option in log-a-move (no overrides/suppression/pairing changes) -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -123,7 +123,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v2.3';
+const BUILD = 'moves-board v2.4';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -265,7 +265,6 @@ async function load(force){
       if(rows.length<2) throw new Error('no rows');
       buildTeams(rows);
     }
-    applyRosterOverrides();   // correct known data errors before rendering
     await loadDraftPicks(force);
     loadMoves();
     render();
@@ -304,30 +303,6 @@ function applyBaseline(data){
     TEAMS[team]['ufa'] = fa.filter(p=> !p.rfaElig);
     BUCKETS.forEach(b=> TEAMS[team][b.key].sort((a,z)=> z.sal-a.sal || a.name.localeCompare(z.name)));
   }
-  teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
-}
-
-// Manual corrections for known data errors in the baseline/contracts feed. Each entry
-// moves a player to the given team + bucket. bucket = under_contract | player_option |
-// team_option | rfa | ufa.
-const ROSTER_OVERRIDES = [
-  { name:'Keshon Gilbert', team:'Atlanta', bucket:'under_contract' },
-];
-function applyRosterOverrides(){
-  ROSTER_OVERRIDES.forEach(o=>{
-    let player=null;
-    for(const tm in TEAMS){
-      BUCKETS.forEach(b=>{ const arr=TEAMS[tm][b.key]; if(!arr) return;
-        for(let i=arr.length-1;i>=0;i--){ if(arr[i].name===o.name){ player=player||arr[i]; arr.splice(i,1); } }
-      });
-    }
-    if(!TEAMS[o.team]){ TEAMS[o.team]={}; BUCKETS.forEach(b=>TEAMS[o.team][b.key]=[]); }
-    if(!TEAMS[o.team][o.bucket]) TEAMS[o.team][o.bucket]=[];
-    const p = player || { name:o.name, sal:0, yos:0, rookie:false };
-    p.rfaElig = _isRFAList(p.name);
-    TEAMS[o.team][o.bucket].push(p);
-    TEAMS[o.team][o.bucket].sort((a,z)=> (z.sal||0)-(a.sal||0) || a.name.localeCompare(z.name));
-  });
   teamOrder = Object.keys(TEAMS).sort((a,b)=> fullTeam(a).localeCompare(fullTeam(b)));
 }
 
@@ -382,14 +357,9 @@ function fmtMeta(p){
 // players, plus reclassified + manual players in their change buckets.
 function effectiveBuckets(team){
   const out={}; BUCKETS.forEach(b=>out[b.key]=[]);
-  // A manual Added/Drafted entry supersedes that player's baseline row ON THE SAME TEAM,
-  // so a trade/draft addition doesn't also linger under his old status (Under Contract).
-  // Scoped to this team so it never touches how he renders on any other team.
-  const manualHere = new Set(MOVES.filter(m=>m.manual && m.team===team).map(m=>m.name.toLowerCase()));
   // baseline players, unless reclassified by a move
   for(const k of BASE_KEYS){
     for(const p of (TEAMS[team] ? TEAMS[team][k] : [])){
-      if(manualHere.has(p.name.toLowerCase())) continue;   // a manual move on THIS team wins over its baseline row
       const mv = moveFor(team, p.name);
       if(mv){
         if(mv.bucket==='exercised'){
@@ -513,7 +483,7 @@ function pickBucket(promptLabel, dflt, isOption, hasMove){
     + '\n\nType one of: ' + opts.join(', ');
   const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
-  const k = ans.trim().toLowerCase().replace(/\s+/g,'_');
+  const k = ans.trim().toLowerCase().replace(/\s+/g,'_');   // "under contract" -> "under_contract" 
   if(!k && dflt) return dflt;
   if(opts.includes(k)) return k;
   alert('Unrecognized category. Use: ' + opts.join(', ') + '.');
@@ -538,10 +508,6 @@ function resolveTeam(input){
 // Create the matching side of a trade on another team (reclassify if that player
 // is on its baseline, else a manual entry). De-dupes; links via pairId.
 function addPaired(team, name, bucket, note, pairId){
-  // If the player already sits in the opposite change bucket on this team (a stale 'left'
-  // when we're now adding him, or vice-versa), clear it so he can't show as both.
-  const opp = bucket==='added' ? 'left' : bucket==='left' ? 'added' : null;
-  if(opp) MOVES = MOVES.filter(m=> !(m.team===team && m.name===name && m.bucket===opp));
   if(MOVES.some(m=>m.team===team && m.name===name && m.bucket===bucket)) return;
   const isBaseline=!!baselineBucketOf(team,name);
   const ex=isBaseline?moveFor(team,name):null;
