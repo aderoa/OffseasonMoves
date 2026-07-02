@@ -123,7 +123,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v2.0';
+const BUILD = 'moves-board v2.1';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -311,7 +311,7 @@ function applyBaseline(data){
 // moves a player to the given team + bucket. bucket = under_contract | player_option |
 // team_option | rfa | ufa.
 const ROSTER_OVERRIDES = [
-  { name:'Keshon Gilbert', team:'ATL', bucket:'under_contract' },
+  { name:'Keshon Gilbert', team:'Atlanta', bucket:'under_contract' },
 ];
 function applyRosterOverrides(){
   ROSTER_OVERRIDES.forEach(o=>{
