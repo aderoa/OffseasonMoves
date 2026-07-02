@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BUILD 2026-07-01b · v2.21 · ROSTER_OVERRIDES (Keshon Gilbert->ATL UC); 'under contract' in log-a-move -->
+<!-- BUILD 2026-07-01b · v2.3 · ROSTER_OVERRIDES (Keshon Gilbert->ATL UC); 'under contract' in log-a-move -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -123,7 +123,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v2.2';
+const BUILD = 'moves-board v2.3';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -382,13 +382,14 @@ function fmtMeta(p){
 // players, plus reclassified + manual players in their change buckets.
 function effectiveBuckets(team){
   const out={}; BUCKETS.forEach(b=>out[b.key]=[]);
-  // A manual Added/Drafted entry for a player supersedes their baseline row, so a player
-  // brought in via trade/draft doesn't also linger under their old status (Under Contract).
-  const manualNames = new Set(MOVES.filter(m=>m.manual).map(m=>m.name.toLowerCase()));
+  // A manual Added/Drafted entry supersedes that player's baseline row ON THE SAME TEAM,
+  // so a trade/draft addition doesn't also linger under his old status (Under Contract).
+  // Scoped to this team so it never touches how he renders on any other team.
+  const manualHere = new Set(MOVES.filter(m=>m.manual && m.team===team).map(m=>m.name.toLowerCase()));
   // baseline players, unless reclassified by a move
   for(const k of BASE_KEYS){
     for(const p of (TEAMS[team] ? TEAMS[team][k] : [])){
-      if(manualNames.has(p.name.toLowerCase())) continue;   // logged move wins over baseline row
+      if(manualHere.has(p.name.toLowerCase())) continue;   // a manual move on THIS team wins over its baseline row
       const mv = moveFor(team, p.name);
       if(mv){
         if(mv.bucket==='exercised'){
@@ -537,6 +538,10 @@ function resolveTeam(input){
 // Create the matching side of a trade on another team (reclassify if that player
 // is on its baseline, else a manual entry). De-dupes; links via pairId.
 function addPaired(team, name, bucket, note, pairId){
+  // If the player already sits in the opposite change bucket on this team (a stale 'left'
+  // when we're now adding him, or vice-versa), clear it so he can't show as both.
+  const opp = bucket==='added' ? 'left' : bucket==='left' ? 'added' : null;
+  if(opp) MOVES = MOVES.filter(m=> !(m.team===team && m.name===name && m.bucket===opp));
   if(MOVES.some(m=>m.team===team && m.name===name && m.bucket===bucket)) return;
   const isBaseline=!!baselineBucketOf(team,name);
   const ex=isBaseline?moveFor(team,name):null;
