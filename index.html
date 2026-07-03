@@ -65,6 +65,10 @@
   .team.collapsed .chev{transform:rotate(-90deg)}
   .team.collapsed .team-bd{display:none}
   .team-bd{padding:.4rem .9rem 1rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.9rem}
+  .removed-strip{grid-column:1/-1;border-top:1px dashed var(--line,#333);margin-top:.2rem;padding-top:.5rem;font-size:.78rem;color:var(--muted,#8a8a8a)}
+  .removed-strip .rl{text-transform:uppercase;letter-spacing:.6px;margin-right:.5rem;opacity:.8}
+  .removed-strip .rm{display:inline-flex;align-items:center;gap:.15rem;margin:0 .55rem .3rem 0;text-decoration:line-through;opacity:.7}
+  .removed-strip .li-act{text-decoration:none;opacity:1}
 
   .bucket h4{margin:.5rem 0 .4rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;
     display:flex;align-items:center;gap:.35rem;padding-bottom:.25rem;border-bottom:1px solid var(--line)}
@@ -123,7 +127,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const BUILD = 'moves-board v2.4';
+const BUILD = 'moves-board v2.5';
 const API_BASE = (location.hostname.includes('github.io') || location.protocol==='file:')
   ? 'https://hoopsmatic.com' : '';
 document.getElementById('build').textContent = BUILD;
@@ -205,7 +209,7 @@ function saveMoves(){
 }
 function moveKey(team,name){ return team+'|'+name; }
 // is there a reclassify move for this baseline player?
-function moveFor(team,name){ return MOVES.find(m=>!m.manual && m.team===team && m.name===name); }
+function moveFor(team,name){ return MOVES.find(m=>!m.manual && m.bucket!=='remove' && m.team===team && m.name===name); }
 function genId(){ return 'm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
 
 // ---------- CSV parse ----------
@@ -357,9 +361,11 @@ function fmtMeta(p){
 // players, plus reclassified + manual players in their change buckets.
 function effectiveBuckets(team){
   const out={}; BUCKETS.forEach(b=>out[b.key]=[]);
+  const removedSet = new Set(MOVES.filter(m=>m.team===team && m.bucket==='remove').map(m=>m.name.toLowerCase()));
   // baseline players, unless reclassified by a move
   for(const k of BASE_KEYS){
     for(const p of (TEAMS[team] ? TEAMS[team][k] : [])){
+      if(removedSet.has(p.name.toLowerCase())) continue;
       const mv = moveFor(team, p.name);
       if(mv){
         if(mv.bucket==='exercised'){
@@ -382,13 +388,14 @@ function effectiveBuckets(team){
   }
   // manual entries (Drafted / incoming Added) for this team
   for(const m of MOVES){
-    if(m.manual && m.team===team) out[m.bucket].push({ name:m.name, sal:0, note:m.note, moveId:m.id, manual:true, extra:m.extra });
+    if(m.manual && m.team===team && m.bucket!=='remove' && !removedSet.has(m.name.toLowerCase())) out[m.bucket].push({ name:m.name, sal:0, note:m.note, moveId:m.id, manual:true, extra:m.extra });
   }
   // auto first-round draft picks (not user moves; de-duped against logged drafted)
   if(DRAFTPICKS[team] && DRAFTPICKS[team].length){
     const seenD = new Set(out['drafted'].map(p=>p.name));
     const movedD = new Set(MOVES.filter(m=>m.team===team).map(m=>m.name.toLowerCase()));
     for(const dp of DRAFTPICKS[team]){
+      if(removedSet.has(dp.name.toLowerCase())) continue;
       if(movedD.has(dp.name.toLowerCase())) continue;   // user logged a move (e.g. signed → Added) → drop the pick placeholder
       if(seenD.has(dp.name)) continue; seenD.add(dp.name);
       out['drafted'].push({ name:dp.name, sal:0, pick:dp.pick, note:'#'+dp.pick, auto:true });
@@ -430,6 +437,8 @@ function render(){
         <h4><span class="dot" style="background:${b.color}"></span>${b.label}<span class="n">${players.length}</span></h4>
         <ul>${items}</ul></div>`;
     }).join('');
+    const _rem = MOVES.filter(m=>m.team===team && m.bucket==='remove');
+    const removedStrip = _rem.length ? `<div class="removed-strip"><span class="rl">Removed</span> ${_rem.map(m=>`<span class="rm">${esc(m.name)}<button class="li-act undo" title="Restore to board" onclick="undoMove('${m.id}')">↩</button></span>`).join('')}</div>` : '';
     blocks.push(`<div class="team${allCollapsed?' collapsed':''}">
       <div class="team-hd" onclick="if(!event.target.closest('.add-mini'))this.parentNode.classList.toggle('collapsed')">
         <span class="nm">${esc(fullTeam(team))}</span>
@@ -437,7 +446,7 @@ function render(){
         <button class="add-mini" title="Add a Drafted or incoming player" onclick="event.stopPropagation();addManual('${jsArg(team)}')">+ Add</button>
         <span class="chev">▼</span>
       </div>
-      <div class="team-bd">${cols}</div>
+      <div class="team-bd">${cols}${removedStrip}</div>
     </div>`);
   }
   el.innerHTML = blocks.length ? blocks.join('') : `<div class="loading">No teams or players match "${esc(filter)}".</div>`;
@@ -474,12 +483,12 @@ function jsArg(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").re
 const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
 
 function pickBucket(promptLabel, dflt, isOption, hasMove){
-  let opts = isOption ? ['exercised','declined','under_contract','added','resigned','extended','left','waived']
-                      : ['under_contract','added','resigned','extended','left','waived'];
+  let opts = isOption ? ['exercised','declined','under_contract','added','resigned','extended','left','waived','remove']
+                      : ['under_contract','added','resigned','extended','left','waived','remove'];
   if(hasMove) opts = opts.concat('clear');
   const head = (isOption
-    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\nunder_contract = keep on roster (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)'
-    : '\n\nunder_contract = keep / rostered (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)')
+    ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\nunder_contract = keep on roster (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)\nremove = drop from the board (e.g. a drafted player not joining)'
+    : '\n\nunder_contract = keep / rostered (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)\nremove = drop from the board (e.g. a drafted player not joining)')
     + '\n\nType one of: ' + opts.join(', ');
   const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
@@ -554,7 +563,7 @@ function logMove(team, name){
   else { src={ id:genId(), team, name, bucket, note:note.trim(), manual:false }; MOVES.push(src); }
   maybePair(src, name, team, bucket);
   saveMoves(); render();
-  const outLabel = bucket==='exercised' ? 'Under Contract' : (bucket==='declined'||bucket==='waived') ? 'Unrestricted FAs' : PRESTO_LABEL[bucket];
+  const outLabel = bucket==='remove' ? 'Removed from board' : bucket==='exercised' ? 'Under Contract' : (bucket==='declined'||bucket==='waived') ? 'Unrestricted FAs' : PRESTO_LABEL[bucket];
   toast(`${name} → ${outLabel}`);
 }
 
