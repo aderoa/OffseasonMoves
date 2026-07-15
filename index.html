@@ -19,7 +19,7 @@
     --amber:#b45309; --amber-lite:#f5a524; --blue:#1a4d8f; --blue-lite:#4d8df6;
     --green:#2f9e6b; --red:#d8584f; --purple:#8b6fc0;
     --uc:#4d8df6; --po:#f5a524; --to:#d8584f; --rfa:#2f9e6b; --ufa:#94a1b0;
-    --added:#3fb97f; --resigned:#5db4e6; --extended:#b89be0; --left:#e07a6f; --drafted:#e0b341;
+    --added:#3fb97f; --resigned:#5db4e6; --extended:#b89be0; --left:#e07a6f; --drafted:#e0b341;--campinvite:#8ea3b8;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
@@ -146,6 +146,7 @@ const BASE_BUCKETS = [
 // Change buckets (logged moves), shown after the baseline.
 const CHANGE_BUCKETS = [
   { key:'added',     label:'Added',     color:'var(--added)' },
+  { key:'campinvite',label:'Training Camp', color:'var(--campinvite)' },
   { key:'resigned',  label:'Re-signed', color:'var(--resigned)' },
   { key:'extended',  label:'Extended',  color:'var(--extended)' },
   { key:'drafted',   label:'Drafted',   color:'var(--drafted)' },
@@ -158,7 +159,7 @@ const CHANGE_KEYS = CHANGE_BUCKETS.map(b=>b.key);
 const PRESTO_LABEL = {
   under_contract:'Under Contract', player_option:'Player Options', team_option:'Team Options',
   rfa:'Restricted Free Agents', ufa:'Unrestricted Free Agents',
-  added:'Added', resigned:'Re-signed', extended:'Extended', drafted:'Drafted', left:'Left', waived:'Waived'
+  added:'Added', campinvite:'Training Camp', resigned:'Re-signed', extended:'Extended', drafted:'Drafted', left:'Left', waived:'Waived'
 };
 
 // Full official team names, keyed by the short name used in the contracts data.
@@ -461,7 +462,7 @@ function liFor(team, bucketKey, p){
   let action;
   if(isChange){
     if(p.moveId){
-      action = `<button class="li-act edit" title="Edit note" onclick="editNote('${p.moveId}')">\u270e</button>`
+      action = `<button class="li-act edit" title="Edit category / note" onclick="editNote('${p.moveId}')">\u270e</button>`
         + `<button class="li-act undo" title="Undo this move" onclick="undoMove('${p.moveId}')">↩</button>`;
     } else if(p.auto){
       // auto draft pick: let the user sign it (→ Added) or otherwise reclassify
@@ -483,12 +484,12 @@ function jsArg(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").re
 const CHANGE_PROMPT = 'added=Added (trade/FA/draft-signed)\nresigned=Re-signed\nextended=Extended\nleft=Left (trade out / signed elsewhere / overseas)';
 
 function pickBucket(promptLabel, dflt, isOption, hasMove){
-  let opts = isOption ? ['exercised','declined','under_contract','added','resigned','extended','left','waived','remove']
-                      : ['under_contract','added','resigned','extended','left','waived','remove'];
+  let opts = isOption ? ['exercised','declined','under_contract','added','campinvite','resigned','extended','left','waived','remove']
+                      : ['under_contract','added','campinvite','resigned','extended','left','waived','remove'];
   if(hasMove) opts = opts.concat('clear');
   const head = (isOption
     ? '\n\nexercised = option picked up (→ Under Contract)\ndeclined = option turned down (→ Free Agent, RFA/UFA per CBA)\nunder_contract = keep on roster (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)\nremove = drop from the board (e.g. a drafted player not joining)'
-    : '\n\nunder_contract = keep / rostered (→ Under Contract)\nwaived = waived (→ Unrestricted Free Agent)\nremove = drop from the board (e.g. a drafted player not joining)')
+    : '\n\nunder_contract = keep / rostered (→ Under Contract)\ncampinvite = training camp / Exhibit 10 (non-guaranteed)\nwaived = waived (→ Unrestricted Free Agent)\nremove = drop from the board (e.g. a drafted player not joining)')
     + '\n\nType one of: ' + opts.join(', ');
   const ans = prompt(promptLabel + head + (dflt?` (default ${dflt})`:''), dflt||'');
   if(ans===null) return null;
@@ -587,10 +588,10 @@ function addManual(team){
   const name = prompt(`Add a player to ${fullTeam(team)} (not yet in the database).\n\nUse this for drafted rookies or incoming signings/trades.\n\nPlayer name:`, '');
   if(name===null || !name.trim()) return;
   const bucket = (function(){
-    const ans = prompt('Category for '+name.trim()+':\n\nType: drafted, added, resigned, extended, or left\n(default: drafted)', 'drafted');
+    const ans = prompt('Category for '+name.trim()+':\n\nType: drafted, added, campinvite, resigned, extended, or left\n(campinvite = training camp / Exhibit 10, non-guaranteed)\n(default: drafted)', 'drafted');
     if(ans===null) return null;
-    const k=ans.trim().toLowerCase()||'drafted';
-    if(['drafted','added','resigned','extended','left'].includes(k)) return k;
+    const k=ans.trim().toLowerCase().replace(/\s+/g,'')||'drafted';
+    if(['drafted','added','campinvite','resigned','extended','left'].includes(k)) return k;
     alert('Unrecognized category.'); return null;
   })();
   if(!bucket) return;
@@ -605,10 +606,20 @@ function addManual(team){
 
 function editNote(moveId){
   const m = MOVES.find(x=>x.id===moveId); if(!m) return;
+  // Category first, so an existing move (e.g. an "Added" player) can be re-filed as
+  // Training Camp / Exhibit 10 without deleting + re-adding it.
+  const CATS = ['drafted','added','campinvite','resigned','extended','left','waived'];
+  const cans = prompt(`Category for ${m.name}:\n\nType one of: ${CATS.join(', ')}\n(campinvite = training camp / Exhibit 10, non-guaranteed)\n\nLeave as-is to keep ${PRESTO_LABEL[m.bucket]||m.bucket}.`, m.bucket);
+  if(cans===null) return;
+  const ck = cans.trim().toLowerCase().replace(/\s+/g,'');
+  if(ck && ck!==m.bucket){
+    if(!CATS.includes(ck)){ alert('Unrecognized category. Use: '+CATS.join(', ')+'.'); return; }
+    m.bucket = ck;
+  }
   const note = prompt(`Note for ${m.name} (${PRESTO_LABEL[m.bucket]||m.bucket}):`, m.note||'');
-  if(note===null) return;
+  if(note===null){ saveMoves(); render(); return; }
   m.note = note.trim(); saveMoves(); render();
-  toast(`Note updated \u2014 ${m.name}`);
+  toast(`Updated \u2014 ${m.name} \u2192 ${PRESTO_LABEL[m.bucket]||m.bucket}`);
 }
 function undoMove(id){
   const m = MOVES.find(x=>x.id===id); if(!m) return;
