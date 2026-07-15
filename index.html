@@ -666,10 +666,11 @@ function buildPrestoHTML(){
   // (On-screen board order is unchanged — this reorders the copy-paste output.)
   const PRESTO_BUCKETS = [
     ...BUCKETS.filter(b => b.key === 'added'),
+    ...BUCKETS.filter(b => b.key === 'campinvite'),
     ...BUCKETS.filter(b => b.key === 'drafted'),
     ...BUCKETS.filter(b => b.key === 'resigned'),
     ...BUCKETS.filter(b => b.key === 'extended'),
-    ...BUCKETS.filter(b => !['added','drafted','resigned','extended'].includes(b.key)),
+    ...BUCKETS.filter(b => !['added','campinvite','drafted','resigned','extended'].includes(b.key)),
   ];
   const L=[];
   L.push('<div class="omb-wrap" style="font-family:sans-serif;max-width:760px;margin:0 auto">');
