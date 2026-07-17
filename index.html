@@ -674,7 +674,7 @@ function buildPrestoHTML(){
   ];
   const L=[];
   L.push('<div class="omb-wrap" style="font-family:sans-serif;max-width:760px;margin:0 auto">');
-  L.push('  <p style="margin:0 0 1em">Where every team stands heading into the 2026-27 offseason — each roster sorted by contract status. We\u2019ll update this board with every move as free agency unfolds.</p>');
+  L.push('  <p style="margin:0 0 1em">While we\u2019re still expecting some big moves, most rosters are shaping up for the 2026-27 season. Here\u2019s how every team has shaken up its roster this offseason.</p>');
   for(const team of teamOrder){
     const t=effectiveBuckets(team);
     const total = BUCKETS.reduce((s,b)=>s+t[b.key].length,0);
